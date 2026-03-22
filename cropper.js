@@ -1,4 +1,7 @@
-// Predefined RHTER grid coordinates (all images 2000x1124px)
+// Predefined RHTER grid coordinates (reference frame: 2000x1124px)
+const REF_WIDTH = 2000;
+const REF_HEIGHT = 1124;
+
 const COLUMN_CENTERS = [
     105, 174, 242, 311, 380, 449, 517, 586, 655, 724,
     792, 861, 930, 998, 1067, 1136, 1205, 1273, 1342, 1411,
@@ -7,7 +10,7 @@ const COLUMN_CENTERS = [
 const COLUMN_HALF_WIDTH = 34;
 
 const ROWS = [
-    { y: 50, height: 375 },
+    { y: 95, height: 330 },
     { y: 428, height: 334 },
     { y: 765, height: 335 },
 ];
@@ -25,7 +28,7 @@ function initCropper(container) {
     // Upload area
     const uploadArea = document.createElement('div');
     uploadArea.className = 'upload-area';
-    uploadArea.textContent = 'Click or drag to upload RHTER screenshot (2000×1124px)';
+    uploadArea.textContent = 'Click or drag to upload RHTER screenshot';
 
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
@@ -91,7 +94,9 @@ function showGridOverlay(section, img) {
     overlay.className = 'grid-overlay';
     overlay.width = img.width;
     overlay.height = img.height;
-    drawGrid(overlay);
+    const scaleX = img.width / REF_WIDTH;
+    const scaleY = img.height / REF_HEIGHT;
+    drawGrid(overlay, scaleX, scaleY);
 
     wrapper.appendChild(canvas);
     wrapper.appendChild(overlay);
@@ -113,41 +118,51 @@ function showGridOverlay(section, img) {
     section.appendChild(controls);
 }
 
-function drawGrid(overlay) {
+function drawGrid(overlay, scaleX, scaleY) {
     const ctx = overlay.getContext('2d');
     ctx.clearRect(0, 0, overlay.width, overlay.height);
     ctx.strokeStyle = 'rgba(233, 69, 96, 0.6)';
     ctx.lineWidth = 1;
 
+    const topY = ROWS[0].y * scaleY;
+    const bottomY = (ROWS[2].y + ROWS[2].height) * scaleY;
+
     // Draw column boundaries
     for (const cx of COLUMN_CENTERS) {
-        const left = cx - COLUMN_HALF_WIDTH;
-        const right = cx + COLUMN_HALF_WIDTH;
+        const left = (cx - COLUMN_HALF_WIDTH) * scaleX;
+        const right = (cx + COLUMN_HALF_WIDTH) * scaleX;
         ctx.beginPath();
-        ctx.moveTo(left, ROWS[0].y);
-        ctx.lineTo(left, ROWS[2].y + ROWS[2].height);
+        ctx.moveTo(left, topY);
+        ctx.lineTo(left, bottomY);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(right, ROWS[0].y);
-        ctx.lineTo(right, ROWS[2].y + ROWS[2].height);
+        ctx.moveTo(right, topY);
+        ctx.lineTo(right, bottomY);
         ctx.stroke();
     }
 
+    const leftX = (COLUMN_CENTERS[0] - COLUMN_HALF_WIDTH) * scaleX;
+    const rightX = (COLUMN_CENTERS[COLUMN_CENTERS.length - 1] + COLUMN_HALF_WIDTH) * scaleX;
+
     // Draw row boundaries
     for (const row of ROWS) {
+        const y1 = row.y * scaleY;
+        const y2 = (row.y + row.height) * scaleY;
         ctx.beginPath();
-        ctx.moveTo(COLUMN_CENTERS[0] - COLUMN_HALF_WIDTH, row.y);
-        ctx.lineTo(COLUMN_CENTERS[COLUMN_CENTERS.length - 1] + COLUMN_HALF_WIDTH, row.y);
+        ctx.moveTo(leftX, y1);
+        ctx.lineTo(rightX, y1);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(COLUMN_CENTERS[0] - COLUMN_HALF_WIDTH, row.y + row.height);
-        ctx.lineTo(COLUMN_CENTERS[COLUMN_CENTERS.length - 1] + COLUMN_HALF_WIDTH, row.y + row.height);
+        ctx.moveTo(leftX, y2);
+        ctx.lineTo(rightX, y2);
         ctx.stroke();
     }
 }
 
 function sliceImage(img) {
     crops = [];
+    const scaleX = img.width / REF_WIDTH;
+    const scaleY = img.height / REF_HEIGHT;
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
 
@@ -155,12 +170,14 @@ function sliceImage(img) {
         const row = ROWS[rowIdx];
         for (let colIdx = 0; colIdx < COLUMN_CENTERS.length; colIdx++) {
             const cx = COLUMN_CENTERS[colIdx];
-            const x = cx - COLUMN_HALF_WIDTH;
-            const w = COLUMN_HALF_WIDTH * 2;
+            const x = (cx - COLUMN_HALF_WIDTH) * scaleX;
+            const w = (COLUMN_HALF_WIDTH * 2) * scaleX;
+            const y = row.y * scaleY;
+            const h = row.height * scaleY;
 
             tempCanvas.width = w;
-            tempCanvas.height = row.height;
-            tempCtx.drawImage(img, x, row.y, w, row.height, 0, 0, w, row.height);
+            tempCanvas.height = h;
+            tempCtx.drawImage(img, x, y, w, h, 0, 0, w, h);
 
             crops.push({
                 row: rowIdx + 1,
