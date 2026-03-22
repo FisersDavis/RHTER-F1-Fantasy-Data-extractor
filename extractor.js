@@ -31,21 +31,24 @@ Example response:
 }`;
 
 function getApiKey() {
-    return localStorage.getItem('geminiApiKey') || '';
+    return sessionStorage.getItem('geminiApiKey') || '';
 }
 
 function setApiKey(key) {
-    localStorage.setItem('geminiApiKey', key);
+    sessionStorage.setItem('geminiApiKey', key);
 }
 
 async function extractSingleCrop(crop, apiKey) {
     const base64 = crop.dataUrl.split(',')[1];
 
     const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
         {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
+            },
             body: JSON.stringify({
                 contents: [{
                     parts: [
@@ -68,7 +71,7 @@ async function extractSingleCrop(crop, apiKey) {
 
     if (!response.ok) {
         const err = await response.text();
-        throw new Error(`API error ${response.status}: ${err}`);
+        throw new Error(`API error ${response.status}: ${err.substring(0, 200)}`);
     }
 
     const data = await response.json();
@@ -98,9 +101,22 @@ function initExtractor(container) {
     input.placeholder = 'Enter your Gemini API key';
     input.addEventListener('input', () => setApiKey(input.value));
 
+    const keyNote = document.createElement('small');
+    keyNote.textContent = 'Key is stored in session only and cleared when you close the tab. Restrict your key in Google Cloud Console for extra safety.';
+    keyNote.style.display = 'block';
+    keyNote.style.marginTop = '4px';
+    keyNote.style.opacity = '0.7';
+
     configDiv.appendChild(label);
     configDiv.appendChild(input);
+    configDiv.appendChild(keyNote);
     section.appendChild(configDiv);
+
+    const notice = document.createElement('p');
+    notice.className = 'status-msg';
+    notice.textContent = 'Note: Cropped images are sent to Google\u2019s Gemini API for extraction. Do not upload confidential data without understanding this.';
+    notice.style.fontStyle = 'italic';
+    section.appendChild(notice);
 
     // Extract button
     const crops = getCrops();
