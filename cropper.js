@@ -10,16 +10,27 @@ const COLUMN_CENTERS = [
 const COLUMN_HALF_WIDTH = 34;
 
 const ROWS = [
-    { y: 95, height: 330 },
-    { y: 428, height: 334 },
-    { y: 765, height: 335 },
+    { y: 102, height: 323 },  // Row 1: y=102 to y=425 (legend cropped out)
+    { y: 428, height: 334 },  // Row 2: y=428 to y=762
+    { y: 765, height: 335 },  // Row 3: y=765 to y=1100
 ];
+
+const UPSCALE_FACTOR = 3;
 
 let uploadedImage = null;
 let crops = [];
 
 function getCrops() {
     return crops;
+}
+
+function loadImage(src) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+    });
 }
 
 function initCropper(container) {
@@ -165,6 +176,8 @@ function sliceImage(img) {
     const scaleY = img.height / REF_HEIGHT;
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
+    const upscaleCanvas = document.createElement('canvas');
+    const upscaleCtx = upscaleCanvas.getContext('2d');
 
     for (let rowIdx = 0; rowIdx < ROWS.length; rowIdx++) {
         const row = ROWS[rowIdx];
@@ -175,17 +188,83 @@ function sliceImage(img) {
             const y = row.y * scaleY;
             const h = row.height * scaleY;
 
+            // Crop at native resolution
             tempCanvas.width = w;
             tempCanvas.height = h;
             tempCtx.drawImage(img, x, y, w, h, 0, 0, w, h);
 
+            // Upscale for better text readability
+            const upW = Math.round(w * UPSCALE_FACTOR);
+            const upH = Math.round(h * UPSCALE_FACTOR);
+            upscaleCanvas.width = upW;
+            upscaleCanvas.height = upH;
+            upscaleCtx.imageSmoothingEnabled = true;
+            upscaleCtx.imageSmoothingQuality = 'high';
+            upscaleCtx.drawImage(tempCanvas, 0, 0, w, h, 0, 0, upW, upH);
+
             crops.push({
                 row: rowIdx + 1,
                 col: colIdx + 1,
-                dataUrl: tempCanvas.toDataURL('image/png'),
+                width: upW,
+                height: upH,
+                dataUrl: upscaleCanvas.toDataURL('image/png'),
             });
         }
     }
+}
+
+async function getRowStrips() {
+    if (!crops.length) return [];
+
+    const strips = [];
+    const labelHeight = 20;
+    const borderWidth = 2;
+
+    for (let rowIdx = 0; rowIdx < 3; rowIdx++) {
+        const rowCrops = crops.filter(c => c.row === rowIdx + 1);
+        if (!rowCrops.length) continue;
+
+        const cropW = rowCrops[0].width;
+        const cropH = rowCrops[0].height;
+
+        const stripW = rowCrops.length * (cropW + borderWidth) + borderWidth;
+        const stripH = labelHeight + cropH + borderWidth;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = stripW;
+        canvas.height = stripH;
+        const ctx = canvas.getContext('2d');
+
+        // Dark background
+        ctx.fillStyle = '#0a0a1a';
+        ctx.fillRect(0, 0, stripW, stripH);
+
+        // Draw each crop with label
+        ctx.font = 'bold 14px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+
+        for (let i = 0; i < rowCrops.length; i++) {
+            const x = borderWidth + i * (cropW + borderWidth);
+            // Column label
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(String(i + 1), x + cropW / 2, labelHeight - 4);
+            // Draw crop image
+            const img = await loadImage(rowCrops[i].dataUrl);
+            ctx.drawImage(img, x, labelHeight);
+            // White border
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = borderWidth;
+            ctx.strokeRect(x, labelHeight, cropW, cropH);
+        }
+
+        strips.push({
+            row: rowIdx + 1,
+            dataUrl: canvas.toDataURL('image/png'),
+        });
+    }
+
+    return strips;
 }
 
 function showCropPreview(section) {
@@ -196,7 +275,7 @@ function showCropPreview(section) {
     preview.className = 'crop-preview';
 
     const heading = document.createElement('h3');
-    heading.textContent = `${crops.length} crops generated`;
+    heading.textContent = `${crops.length} crops generated (${UPSCALE_FACTOR}x upscaled)`;
     preview.appendChild(heading);
 
     const grid = document.createElement('div');
@@ -212,4 +291,59 @@ function showCropPreview(section) {
     section.appendChild(preview);
 }
 
-export { initCropper, getCrops, COLUMN_CENTERS, COLUMN_HALF_WIDTH, ROWS };
+async function getBatchStrips(batchSize = 3) {
+    if (!crops.length) return [];
+
+    const strips = [];
+    const labelHeight = 20;
+    const borderWidth = 2;
+
+    for (let rowIdx = 0; rowIdx < 3; rowIdx++) {
+        const rowCrops = crops.filter(c => c.row === rowIdx + 1);
+        if (!rowCrops.length) continue;
+
+        for (let batchStart = 0; batchStart < rowCrops.length; batchStart += batchSize) {
+            const batch = rowCrops.slice(batchStart, batchStart + batchSize);
+
+            const cropW = batch[0].width;
+            const cropH = batch[0].height;
+
+            const stripW = batch.length * (cropW + borderWidth) + borderWidth;
+            const stripH = labelHeight + cropH + borderWidth;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = stripW;
+            canvas.height = stripH;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#0a0a1a';
+            ctx.fillRect(0, 0, stripW, stripH);
+
+            ctx.font = 'bold 14px monospace';
+            ctx.textAlign = 'center';
+
+            for (let i = 0; i < batch.length; i++) {
+                const x = borderWidth + i * (cropW + borderWidth);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(String(batch[i].col), x + cropW / 2, labelHeight - 4);
+                const img = await loadImage(batch[i].dataUrl);
+                ctx.drawImage(img, x, labelHeight);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = borderWidth;
+                ctx.strokeRect(x, labelHeight, cropW, cropH);
+            }
+
+            strips.push({
+                row: rowIdx + 1,
+                colStart: batch[0].col,
+                colEnd: batch[batch.length - 1].col,
+                count: batch.length,
+                dataUrl: canvas.toDataURL('image/png'),
+            });
+        }
+    }
+
+    return strips;
+}
+
+export { initCropper, getCrops, getRowStrips, getBatchStrips, COLUMN_CENTERS, COLUMN_HALF_WIDTH, ROWS };

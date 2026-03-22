@@ -7,7 +7,6 @@ const VIEWS = ['cropper', 'extractor', 'data', 'analysis'];
 
 const state = {
     currentView: localStorage.getItem('currentView') || 'cropper',
-    apiKey: sessionStorage.getItem('geminiApiKey') || '',
 };
 
 function saveState() {
