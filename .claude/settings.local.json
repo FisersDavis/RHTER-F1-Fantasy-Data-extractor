@@ -8,7 +8,9 @@
       "WebFetch(domain:github.com)",
       "WebSearch",
       "WebFetch(domain:docs.x.ai)",
-      "Bash(curl -s -X POST http://localhost:8735/v1/chat/completions -H \"Content-Type: application/json\" -H \"Authorization: Bearer test-key\" -H \"Origin: http://localhost:5500\" -d '{\"\"\"\"model\"\"\"\":\"\"\"\"grok-4-1-fast-non-reasoning\"\"\"\",\"\"\"\"messages\"\"\"\":[{\"\"\"\"role\"\"\"\":\"\"\"\"user\"\"\"\",\"\"\"\"content\"\"\"\":\"\"\"\"hi\"\"\"\"}]}' -w \"\\\\nHTTP Status: %{http_code}\")"
+      "Bash(curl -s -X POST http://localhost:8735/v1/chat/completions -H \"Content-Type: application/json\" -H \"Authorization: Bearer test-key\" -H \"Origin: http://localhost:5500\" -d '{\"\"\"\"model\"\"\"\":\"\"\"\"grok-4-1-fast-non-reasoning\"\"\"\",\"\"\"\"messages\"\"\"\":[{\"\"\"\"role\"\"\"\":\"\"\"\"user\"\"\"\",\"\"\"\"content\"\"\"\":\"\"\"\"hi\"\"\"\"}]}' -w \"\\\\nHTTP Status: %{http_code}\")",
+      "Bash(cd /c/Users/Dave/Documents/Projects/RHTER\\ F1\\ Fantasy\\ Data\\ extractor*)",
+      "Bash(*)"
     ]
   }
 }

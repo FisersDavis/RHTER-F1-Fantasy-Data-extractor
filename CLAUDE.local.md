@@ -7,6 +7,8 @@ A two-part system for extracting structured data from RHTER F1 Fantasy Tools vio
 1. **Python pipeline** (runs locally, offline) — preprocesses crops, extracts numbers via Gemini Flash, identifies constructor colors via k-means, validates, and outputs JSON.
 2. **Web app** (GitHub Pages) — handles image upload and cropping, receives pipeline JSON, provides a human review/correction UI, joins results into a unified dataset, and supports analysis/visualization.
 
+The absolute input is a full RHTER violin plot screenshot (e.g. 2786×1567px). The web app slices it into 72 raw crops; the Python pipeline preprocesses and extracts data from those crops.
+
 ## Architecture boundary
 
 Everything that touches image pixels or runs ML is Python. The web app never preprocesses images, samples colors, or runs k-means.
@@ -26,10 +28,12 @@ Everything that touches image pixels or runs ML is Python. The web app never pre
 
 ### Stage 1 — Preprocess (Pillow)
 
-- Invert dark background to light: `ImageOps.invert()`
-- Upscale 2–4× with LANCZOS resampling
-- Boost contrast on text regions
-- Input: individual violin crops (exported from web app cropper); output: preprocessed PNGs
+- Input: raw variable-size violin crops from web app (the 3 row regions have different heights: 323, 334, 335px in the 2000×1124 reference frame, so exported crops are not uniform)
+- **Step 0 — Normalize crop dimensions**: Pad all crops to the tallest row height using `Image.paste()` with the RHTER dark background fill color. Padding goes at the **top** so driver labels and violin body are pinned to the bottom edge. After this step all 72 crops are identical in size.
+- **Step 1 — Invert**: Dark background to light: `ImageOps.invert()`
+- **Step 2 — Upscale**: 2–4× with LANCZOS resampling
+- **Step 3 — Boost contrast** on text regions
+- Output: uniform-size preprocessed PNGs (all 72 same dimensions), ready for Stages 2–3
 
 ### Stage 2 — Extract numbers (Gemini Flash)
 
