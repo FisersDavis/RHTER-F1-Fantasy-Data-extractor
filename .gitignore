@@ -4,3 +4,6 @@
 *.pem
 .DS_Store
 Thumbs.db
+
+# Local data (not served)
+data/
