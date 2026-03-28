@@ -94,14 +94,16 @@ def extract_colors_crop(raw_path):
     x_end = int(w * 0.90)
     region = pixels[y_start:y_end, x_start:x_end].reshape(-1, 3).astype(np.float64)
 
-    # Filter by saturation to isolate colored violin body pixels.
-    # Background and text are grey/dark (low saturation); violin bodies are
-    # strongly colored (high saturation).
+    # Filter to isolate violin body pixels from dark background/text.
+    # Two categories: saturated pixels (colored bodies like FER, MCL, MER)
+    # and bright near-white pixels (HAA white bodies).
     r, g, b = region[:, 0], region[:, 1], region[:, 2]
     cmax = np.maximum(r, np.maximum(g, b))
     cmin = np.minimum(r, np.minimum(g, b))
     sat = np.where(cmax > 0, (cmax - cmin) / cmax, 0)
-    foreground = region[sat > 0.5]
+    is_colored = sat > 0.5
+    is_bright_white = (cmax > 200) & (sat < 0.15)
+    foreground = region[is_colored | is_bright_white]
 
     if len(foreground) < 50:
         flags.append(f"insufficient_pixels (only {len(foreground)} foreground pixels)")

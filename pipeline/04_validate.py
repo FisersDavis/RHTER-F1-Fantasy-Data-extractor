@@ -20,6 +20,7 @@ from pipeline.config import (
     AVG_XPTS_DOLLAR_IMPACT_RANGE,
     AVG_BUDGET_UPLIFT_RANGE,
     PERCENTILE_RANGE,
+    PERCENTILE_MONOTONIC,
 )
 
 FILENAME_PATTERN = re.compile(r"^row(\d+)_col(\d+)\.json$")
@@ -31,12 +32,24 @@ def validate_crop(crop_data):
     Returns a list of flag reason strings (empty if all checks pass).
     """
     flags = []
-    header = crop_data.get("header") or {}
-    percentiles = crop_data.get("percentiles") or {}
-    drivers = crop_data.get("drivers") or []
+    header = crop_data.get("header")
+    percentiles = crop_data.get("percentiles")
+    drivers = crop_data.get("drivers")
     constructors = crop_data.get("constructors")
 
-    # --- Numeric range checks ---
+    # --- Null checks on top-level sections ---
+    if header is None:
+        flags.append("null_field: header is null")
+    if percentiles is None:
+        flags.append("null_field: percentiles is null")
+    if drivers is None:
+        flags.append("null_field: drivers is null")
+
+    # If critical sections missing, skip detailed checks
+    if header is None or percentiles is None or drivers is None:
+        return flags
+
+    # --- Header null + range checks ---
     range_checks = [
         ("budget_required", header.get("budget_required"), BUDGET_REQUIRED_RANGE),
         ("avg_xpts", header.get("avg_xpts"), AVG_XPTS_RANGE),
@@ -44,49 +57,65 @@ def validate_crop(crop_data):
         ("avg_budget_uplift", header.get("avg_budget_uplift"), AVG_BUDGET_UPLIFT_RANGE),
     ]
     for name, value, (lo, hi) in range_checks:
-        if value is not None and not (lo <= value <= hi):
+        if value is None:
+            flags.append(f"null_field: {name} is null")
+        elif not (lo <= value <= hi):
             flags.append(f"range_error: {name}={value} outside [{lo}, {hi}]")
 
-    # --- Percentile range checks ---
+    # --- Percentile null + range checks ---
     pct_keys = ["p95", "p75", "p50", "p25", "p05"]
     pct_lo, pct_hi = PERCENTILE_RANGE
     for key in pct_keys:
         val = percentiles.get(key)
-        if val is not None and not (pct_lo <= val <= pct_hi):
+        if val is None:
+            flags.append(f"null_field: {key} is null")
+        elif not (pct_lo <= val <= pct_hi):
             flags.append(f"range_error: {key}={val} outside [{pct_lo}, {pct_hi}]")
 
     # --- Percentile monotonicity: p95 > p75 > p50 > p25 > p05 ---
-    pct_values = [percentiles.get(k) for k in pct_keys]
-    if all(v is not None for v in pct_values):
-        for i in range(len(pct_values) - 1):
-            if pct_values[i] < pct_values[i + 1]:
-                flags.append(
-                    f"monotonicity_error: {pct_keys[i]}={pct_values[i]} "
-                    f"< {pct_keys[i+1]}={pct_values[i+1]}"
-                )
+    if PERCENTILE_MONOTONIC:
+        pct_values = [percentiles.get(k) for k in pct_keys]
+        if all(v is not None for v in pct_values):
+            for i in range(len(pct_values) - 1):
+                if pct_values[i] <= pct_values[i + 1]:
+                    flags.append(
+                        f"monotonicity_error: {pct_keys[i]}={pct_values[i]} "
+                        f"<= {pct_keys[i+1]}={pct_values[i+1]}"
+                    )
 
     # --- Driver validation ---
-    if drivers:
-        driver_names = [d.get("name") for d in drivers if d.get("name")]
+    if not isinstance(drivers, list) or len(drivers) != 5:
+        count = len(drivers) if isinstance(drivers, list) else 0
+        flags.append(f"driver_count_error: expected 5 drivers, got {count}")
+    else:
+        multiplier_count = 0
+        for i, d in enumerate(drivers):
+            if d is None:
+                flags.append(f"null_field: driver[{i}] is null")
+                continue
 
-        # 3-letter uppercase
-        for name in driver_names:
-            if not (len(name) == 3 and name.isalpha() and name.isupper()):
-                flags.append(f"driver_format_error: {name!r} is not 3-letter uppercase")
+            name = d.get("name")
+            if name is None:
+                flags.append(f"null_field: driver[{i}].name is null")
+            else:
+                if not (len(name) == 3 and name.isalpha() and name.isupper()):
+                    flags.append(f"driver_format_error: {name!r} is not 3-letter uppercase")
+                if name not in VALID_DRIVERS_2026:
+                    flags.append(f"unknown_driver: {name}")
 
-        # Known drivers
-        for name in driver_names:
-            if name not in VALID_DRIVERS_2026:
-                flags.append(f"unknown_driver: {name}")
+            if d.get("multiplier") == "2X":
+                multiplier_count += 1
 
         # No duplicates
+        driver_names = [d.get("name") for d in drivers if d and d.get("name")]
         if len(driver_names) != len(set(driver_names)):
             flags.append("duplicate_driver")
 
         # Exactly one 2X multiplier
-        multiplied = [d for d in drivers if d.get("multiplier") == "2X"]
-        if len(multiplied) != 1:
-            flags.append(f"multiplier_error: expected 1 driver with 2X, found {len(multiplied)}")
+        if multiplier_count == 0:
+            flags.append("multiplier_error: no 2X multiplier found")
+        elif multiplier_count > 1:
+            flags.append(f"multiplier_error: expected 1 driver with 2X, found {multiplier_count}")
 
     # --- Constructor validation ---
     if constructors:
