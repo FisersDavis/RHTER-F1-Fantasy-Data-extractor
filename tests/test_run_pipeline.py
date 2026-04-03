@@ -81,3 +81,65 @@ def test_prerequisites_no_api_keys(tmp_path, monkeypatch):
     errors, _ = rp._check_prerequisites()
 
     assert any("API" in e or "api" in e.lower() for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# _write_final_results
+# ---------------------------------------------------------------------------
+
+def _make_crop_jsons(output_dir, count=3):
+    """Write minimal row/col JSON files to output_dir."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for i in range(count):
+        p = output_dir / f"row0_col{i:02d}.json"
+        p.write_text(json.dumps({"row": 0, "col": i}))
+
+
+def test_write_final_results_named_file(tmp_path, monkeypatch):
+    """stem parameter controls output filename."""
+    output_dir = tmp_path / "output"
+    final_dir = tmp_path / "final"
+    _make_crop_jsons(output_dir)
+    monkeypatch.setattr(rp, "DATA_OUTPUT", output_dir)
+    monkeypatch.setattr(rp, "DATA_FINAL", final_dir)
+
+    result_path = rp._write_final_results(stem="rw1_2026_r04")
+
+    assert result_path == final_dir / "rw1_2026_r04.json"
+    assert result_path.exists()
+    data = json.loads(result_path.read_text())
+    assert len(data) == 3
+
+
+def test_write_final_results_overwrites_same_stem(tmp_path, monkeypatch):
+    """Calling twice with the same stem overwrites the file."""
+    output_dir = tmp_path / "output"
+    final_dir = tmp_path / "final"
+    _make_crop_jsons(output_dir, count=2)
+    monkeypatch.setattr(rp, "DATA_OUTPUT", output_dir)
+    monkeypatch.setattr(rp, "DATA_FINAL", final_dir)
+
+    rp._write_final_results(stem="myshot")
+    _make_crop_jsons(output_dir, count=4)  # add more crops
+    rp._write_final_results(stem="myshot")
+
+    data = json.loads((final_dir / "myshot.json").read_text())
+    assert len(data) == 4  # second write wins
+
+
+def test_write_final_results_different_stems_coexist(tmp_path, monkeypatch):
+    """Different stems produce separate files without touching each other."""
+    output_dir = tmp_path / "output"
+    final_dir = tmp_path / "final"
+    monkeypatch.setattr(rp, "DATA_OUTPUT", output_dir)
+    monkeypatch.setattr(rp, "DATA_FINAL", final_dir)
+
+    _make_crop_jsons(output_dir, count=2)
+    rp._write_final_results(stem="race_a")
+    _make_crop_jsons(output_dir, count=3)
+    rp._write_final_results(stem="race_b")
+
+    assert (final_dir / "race_a.json").exists()
+    assert (final_dir / "race_b.json").exists()
+    assert len(json.loads((final_dir / "race_a.json").read_text())) == 2
+    assert len(json.loads((final_dir / "race_b.json").read_text())) == 3
