@@ -1,9 +1,7 @@
 import { initCropper } from './cropper.js';
-import { initExtractor } from './extractor.js';
 import { initDataStore } from './dataStore.js';
-import { initAnalysis } from './analysis.js';
 
-const VIEWS = ['cropper', 'extractor', 'data', 'analysis'];
+const VIEWS = ['cropper', 'data'];
 
 const state = {
     currentView: localStorage.getItem('currentView') || 'cropper',
@@ -38,14 +36,8 @@ function render() {
         case 'cropper':
             initCropper(app);
             break;
-        case 'extractor':
-            initExtractor(app);
-            break;
         case 'data':
             initDataStore(app);
-            break;
-        case 'analysis':
-            initAnalysis(app);
             break;
     }
 }
