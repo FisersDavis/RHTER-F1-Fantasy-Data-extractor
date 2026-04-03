@@ -11,6 +11,9 @@ import json
 import os
 import sys
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from pipeline.config import DATA_RAW, DATA_OUTPUT, DATA_FINAL
 
 # Numeric-prefixed modules can't use normal import syntax
