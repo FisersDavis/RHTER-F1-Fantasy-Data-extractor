@@ -24,7 +24,7 @@ CONTRAST_FACTOR = 1.5               # ImageEnhance.Contrast multiplier
 # ---------------------------------------------------------------------------
 GEMINI_MODEL = "gemini-2.5-flash"
 EXPECTED_LINES = 14
-API_DELAY_SECONDS = 1.0             # delay between API calls
+API_DELAY_SECONDS = 13.0            # delay between API calls (free tier: 5 req/min)
 
 # ---------------------------------------------------------------------------
 # Stage 3 — Color extraction
@@ -61,7 +61,7 @@ VALID_DRIVERS_2026 = {
     # Williams
     "SAI", "ALB",
     # RB / VCARB
-    "LAW", "HAD",
+    "LAW", "LIN",
     # Aston Martin
     "ALO", "STR",
     # Haas
