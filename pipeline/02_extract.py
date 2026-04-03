@@ -185,11 +185,15 @@ def write_crop_json(row, col, parsed_data, flags, raw_response=""):
 
 
 def extract_all():
-    """Process all preprocessed crops through Gemini extraction.
+    """Process all preprocessed crops through two-tier extraction.
+
+    Tier 1: LlamaExtract (all crops, async parallel)
+    Tier 2: Gemini Flash (flagged crops only, sequential)
 
     Returns (success_count, flagged_count, flagged_list).
     """
-    client = _get_client()
+    import os
+    from pipeline.config import LLAMA_CLOUD_API_KEY_ENV
 
     crops = sorted(
         p for p in DATA_PREPROCESSED.iterdir()
@@ -200,6 +204,97 @@ def extract_all():
         print("WARNING: No preprocessed crops found in", DATA_PREPROCESSED)
         return 0, 0, []
 
+    # --- Check which extractors are available ---
+    has_llama = bool(os.environ.get(LLAMA_CLOUD_API_KEY_ENV))
+    has_gemini = bool(os.environ.get("GEMINI_API_KEY"))
+
+    if not has_llama:
+        print("  LLAMA_CLOUD_API_KEY not set — using Gemini-only mode")
+        return _extract_all_gemini_only(crops)
+
+    # --- Stage 2A: LlamaExtract (all crops) ---
+    from pipeline._02a_llama_extract import extract_all_llama
+    llama_results = extract_all_llama(crops)
+
+    # --- Separate passed vs flagged ---
+    passed_results = {}
+    flagged_crops = []
+
+    for crop_path in crops:
+        m = FILENAME_PATTERN.match(crop_path.name)
+        row, col = int(m.group(1)), int(m.group(2))
+        key = (row, col)
+
+        if key not in llama_results:
+            flagged_crops.append((crop_path, row, col))
+            continue
+
+        parsed, flags, raw = llama_results[key]
+        if flags:
+            flagged_crops.append((crop_path, row, col))
+        else:
+            # Write passing LlamaExtract results immediately
+            write_crop_json(row, col, parsed, flags, raw)
+            passed_results[key] = True
+
+    # --- Stage 2C: Gemini fallback for flagged crops ---
+    gemini_passed = 0
+    still_flagged = []
+
+    if flagged_crops and has_gemini:
+        print(f"\n  Falling back to Gemini Flash for {len(flagged_crops)} flagged crops...")
+        from pipeline._02b_sanity import sanity_check
+
+        client = _get_client()
+
+        for idx, (crop_path, row, col) in enumerate(flagged_crops):
+            parsed, flags, raw = extract_crop(crop_path, client)
+
+            # Stage 2D: Sanity check on Gemini output
+            gemini_flags = []
+            if parsed:
+                gemini_flags = sanity_check(parsed)
+
+            all_flags = flags + gemini_flags
+            write_crop_json(row, col, parsed, all_flags, raw)
+
+            status = "OK" if not all_flags else f"STILL FLAGGED: {', '.join(all_flags)}"
+            print(f"    [{idx+1}/{len(flagged_crops)}] {crop_path.name} {status}")
+
+            if all_flags:
+                still_flagged.append(crop_path.name)
+            else:
+                gemini_passed += 1
+
+            if idx < len(flagged_crops) - 1:
+                time.sleep(API_DELAY_SECONDS)
+
+        print(f"  Gemini fallback: {gemini_passed} resolved, {len(still_flagged)} still flagged")
+
+    elif flagged_crops and not has_gemini:
+        print(f"\n  GEMINI_API_KEY not set — {len(flagged_crops)} crops go to manual review")
+        for crop_path, row, col in flagged_crops:
+            key = (row, col)
+            if key in llama_results:
+                parsed, flags, raw = llama_results[key]
+            else:
+                parsed, flags, raw = None, ["llama_extract_missing"], ""
+            write_crop_json(row, col, parsed, flags, raw)
+            still_flagged.append(crop_path.name)
+
+    total_passed = len(passed_results) + gemini_passed
+    total_flagged = len(still_flagged)
+
+    print(f"Stage 2 complete: {total_passed} success, {total_flagged} flagged")
+    return total_passed, total_flagged, still_flagged
+
+
+def _extract_all_gemini_only(crops):
+    """Fallback: process all crops through Gemini only (original behavior).
+
+    Returns (success_count, flagged_count, flagged_list).
+    """
+    client = _get_client()
     success = 0
     flagged_list = []
 
@@ -218,7 +313,6 @@ def extract_all():
         else:
             success += 1
 
-        # Rate limiting between API calls
         if idx < len(crops) - 1:
             time.sleep(API_DELAY_SECONDS)
 
