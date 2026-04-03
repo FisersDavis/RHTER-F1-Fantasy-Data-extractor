@@ -22,9 +22,9 @@ CONTRAST_FACTOR = 1.5               # ImageEnhance.Contrast multiplier
 # ---------------------------------------------------------------------------
 # Stage 2 — Gemini extraction
 # ---------------------------------------------------------------------------
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.1-flash-lite-preview"
 EXPECTED_LINES = 14
-API_DELAY_SECONDS = 13.0            # delay between API calls (free tier: 5 req/min)
+API_DELAY_SECONDS = 4.5             # delay between API calls (free tier: 15 req/min)
 
 # ---------------------------------------------------------------------------
 # Stage 2A — LlamaExtract (primary extractor)
