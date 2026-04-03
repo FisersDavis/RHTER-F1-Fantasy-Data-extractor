@@ -96,20 +96,20 @@ def test_missing_field_flagged():
 
 
 def test_budget_range_too_low():
-    crop = _make_crop({"header.budget_required": 80.0})
+    crop = _make_crop({"header.budget_required": 70.0})
     flags = sanity_check(crop)
     assert "budget_range" in flags
 
 
 def test_budget_range_too_high():
-    crop = _make_crop({"header.budget_required": 120.0})
+    crop = _make_crop({"header.budget_required": 160.0})
     flags = sanity_check(crop)
     assert "budget_range" in flags
 
 
 def test_multiple_flags_accumulate():
     crop = _make_crop({
-        "header.budget_required": 80.0,
+        "header.budget_required": 70.0,
         "header.avg_xpts": None,
     })
     crop["drivers"][0]["multiplier"] = None
