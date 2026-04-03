@@ -1,9 +1,12 @@
 """Pipeline orchestrator — single entry point for the full extraction pipeline.
 
-Chains Stages 1-4 and provides interactive flag resolution.
+Drop a screenshot into data/screenshots/, then run:
 
-Usage:
     python -m pipeline.run_pipeline
+
+Stage 0 crops the screenshot, Stages 1-4 extract and validate, the flag
+resolution menu handles any issues, and the final JSON is written to
+data/final/<screenshot-stem>.json.
 """
 
 import importlib
