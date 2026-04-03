@@ -167,6 +167,53 @@ def _rerun_flagged(flagged_list):
     return still_flagged
 
 
+def _verify_flagged(flagged_list):
+    """Re-read flagged crop JSONs from disk and re-run validate_crop on each.
+
+    Returns a dict mapping crop name -> list of current flag reasons.
+    An empty list means the crop now passes validation.
+    A list containing 'file_not_found' means the JSON was missing on disk.
+
+    Does NOT write anything to disk.
+    """
+    print(f"\nVerifying {len(flagged_list)} flagged crop(s)...")
+
+    results = {}
+    resolved = 0
+
+    for name in flagged_list:
+        base = name.replace(".json", "").replace(".png", "")
+        json_path = DATA_OUTPUT / f"{base}.json"
+
+        if not json_path.exists():
+            print(f"  {name}: ERROR — file not found on disk")
+            results[name] = ["file_not_found"]
+            continue
+
+        with open(json_path) as f:
+            record = json.load(f)
+
+        current_flags = validate_crop(record)
+
+        if not current_flags:
+            print(f"  {name}: OK (no flags — edits look good, ready to accept)")
+            resolved += 1
+        else:
+            reasons = ", ".join(current_flags)
+            print(f"  {name}: STILL FLAGGED — {reasons}")
+
+        results[name] = current_flags
+
+    still_flagged = len(flagged_list) - resolved
+    print(f"\n{resolved}/{len(flagged_list)} resolved. ", end="")
+    if still_flagged > 0:
+        print("Fix remaining crops and press [V] again, or [A] to accept all anyway.")
+    else:
+        print("All clear — press [A] to write results.")
+
+    return results
+
+
 def _write_final_results():
     """Collect all per-crop JSONs into data/final/results.json."""
     import re
@@ -203,6 +250,7 @@ def _flag_resolution_menu(flagged_list):
             print(f"  - {name}")
         print()
         print("  [R] Rerun flagged crops through Stages 2-4")
+        print("  [V] Verify edits — re-check flagged crops on disk")
         print("  [S] Show details for a specific flagged crop")
         print("  [A] Accept all and write results.json (flags preserved)")
         print("  [Q] Quit without writing final output")
@@ -215,6 +263,8 @@ def _flag_resolution_menu(flagged_list):
             if not flagged_list:
                 print("All flags resolved!")
                 return True
+        elif choice == "V":
+            _verify_flagged(flagged_list)
         elif choice == "S":
             print("Enter crop name (e.g. row0_col00.png):")
             crop = input("  > ").strip()
