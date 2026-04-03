@@ -27,6 +27,46 @@ EXPECTED_LINES = 14
 API_DELAY_SECONDS = 13.0            # delay between API calls (free tier: 5 req/min)
 
 # ---------------------------------------------------------------------------
+# Stage 2A — LlamaExtract (primary extractor)
+# ---------------------------------------------------------------------------
+LLAMA_CLOUD_API_KEY_ENV = "LLAMA_CLOUD_API_KEY"
+LLAMA_EXTRACT_TIER = "cost_effective"
+LLAMA_EXTRACT_CONCURRENCY = 5          # asyncio.Semaphore limit
+
+LLAMA_EXTRACT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "budget_required": {
+            "type": "number",
+            "description": "Budget Required (top header number)",
+        },
+        "avg_xpts": {
+            "type": "number",
+            "description": "Average xPts (second header number)",
+        },
+        "avg_xpts_dollar_impact": {
+            "type": "number",
+            "description": "Avg xPts + ($ impact) (third header number)",
+        },
+        "budget_uplift": {
+            "type": "number",
+            "description": "Avg Budget Uplift (fourth header number, always 2 decimal places e.g. 0.55)",
+        },
+        "p95": {"type": "number"},
+        "p75": {"type": "number"},
+        "p50": {"type": "number"},
+        "p25": {"type": "number"},
+        "p05": {"type": "number"},
+        "driver_1": {"type": "string"},
+        "driver_1_2x": {"type": "boolean"},
+        "driver_2": {"type": "string"},
+        "driver_3": {"type": "string"},
+        "driver_4": {"type": "string"},
+        "driver_5": {"type": "string"},
+    },
+}
+
+# ---------------------------------------------------------------------------
 # Stage 3 — Color extraction
 # ---------------------------------------------------------------------------
 KMEANS_K = 3
