@@ -14,7 +14,7 @@ import sys
 from dotenv import load_dotenv
 load_dotenv()
 
-from pipeline.config import DATA_RAW, DATA_OUTPUT, DATA_FINAL
+from pipeline.config import DATA_RAW, DATA_OUTPUT, DATA_FINAL, DATA_SCREENSHOTS
 
 # Numeric-prefixed modules can't use normal import syntax
 _preprocess = importlib.import_module("pipeline.01_preprocess")
@@ -34,18 +34,34 @@ validate_crop = _validate.validate_crop
 
 
 def _check_prerequisites():
-    """Verify data/raw/ has PNGs and at least one API key is set.
+    """Verify data/screenshots/ has an image and at least one API key is set.
 
-    Returns list of error messages (empty if all OK).
+    Returns (errors, screenshot_path).
+    errors is a list of strings (empty if all OK).
+    screenshot_path is the Path of the found screenshot, or None on error.
     """
     errors = []
+    screenshot_path = None
 
-    if not DATA_RAW.exists():
-        errors.append(f"Directory not found: {DATA_RAW}")
+    if not DATA_SCREENSHOTS.exists():
+        errors.append(
+            f"No screenshot found in data/screenshots/ — "
+            "add a .webp, .png, or .jpg file and rerun."
+        )
     else:
-        pngs = [p for p in DATA_RAW.iterdir() if p.suffix.lower() == ".png"]
-        if not pngs:
-            errors.append(f"No PNG files found in {DATA_RAW}")
+        candidates = sorted(
+            p for p in DATA_SCREENSHOTS.iterdir()
+            if p.suffix.lower() in (".webp", ".png", ".jpg", ".jpeg")
+        )
+        if not candidates:
+            errors.append(
+                "No screenshot found in data/screenshots/ — "
+                "add a .webp, .png, or .jpg file and rerun."
+            )
+        else:
+            screenshot_path = candidates[0]
+            if len(candidates) > 1:
+                print(f"  Found {len(candidates)} screenshots, using: {screenshot_path.name}")
 
     has_llama = bool(os.environ.get("LLAMA_CLOUD_API_KEY"))
     has_gemini = bool(os.environ.get("GEMINI_API_KEY"))
@@ -61,7 +77,7 @@ def _check_prerequisites():
     elif not has_llama and has_gemini:
         print("  NOTE: LLAMA_CLOUD_API_KEY not set — using Gemini-only mode (slow)")
 
-    return errors
+    return errors, screenshot_path
 
 
 def _show_crop_details(crop_name):
@@ -284,7 +300,7 @@ def main():
     print("=" * 60)
 
     # Check prerequisites
-    errors = _check_prerequisites()
+    errors, screenshot_path = _check_prerequisites()
     if errors:
         print("\nPrerequisite check failed:")
         for e in errors:
