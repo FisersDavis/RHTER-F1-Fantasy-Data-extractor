@@ -11,11 +11,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Mock the numeric-prefixed pipeline modules (and their heavy deps) before
 # run_pipeline is imported, so PIL / sklearn / etc. are not required at test time.
+_mock_crop = MagicMock()
 _mock_preprocess = MagicMock()
 _mock_extract = MagicMock()
 _mock_colors = MagicMock()
 _mock_validate = MagicMock()
 
+sys.modules.setdefault("pipeline.00_crop", _mock_crop)
 sys.modules.setdefault("pipeline.01_preprocess", _mock_preprocess)
 sys.modules.setdefault("pipeline.02_extract", _mock_extract)
 sys.modules.setdefault("pipeline.03_colors", _mock_colors)

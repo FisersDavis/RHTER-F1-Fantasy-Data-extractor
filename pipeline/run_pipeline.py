@@ -17,11 +17,13 @@ load_dotenv()
 from pipeline.config import DATA_RAW, DATA_OUTPUT, DATA_FINAL, DATA_SCREENSHOTS
 
 # Numeric-prefixed modules can't use normal import syntax
+_crop = importlib.import_module("pipeline.00_crop")
 _preprocess = importlib.import_module("pipeline.01_preprocess")
 _extract = importlib.import_module("pipeline.02_extract")
 _colors = importlib.import_module("pipeline.03_colors")
 _validate = importlib.import_module("pipeline.04_validate")
 
+crop_all = _crop.crop_all
 preprocess_all = _preprocess.preprocess_all
 extract_all = _extract.extract_all
 extract_crop = _extract.extract_crop
@@ -308,6 +310,15 @@ def main():
         sys.exit(1)
     print("Prerequisites OK\n")
 
+    stem = screenshot_path.stem  # e.g. "rw1_2026_r04"
+
+    # Stage 0 — Crop
+    print("-" * 40)
+    print("Stage 0: Crop")
+    print("-" * 40)
+    crop_all()
+    print()
+
     # Stage 1 — Preprocess
     print("-" * 40)
     print("Stage 1: Preprocess")
@@ -353,13 +364,13 @@ def main():
     if not s4_flagged_list:
         # No flags — auto-write results
         print("No flags detected. Writing final results...")
-        _write_final_results()
+        _write_final_results(stem)
         print("\nPipeline complete!")
     else:
         # Flags exist — show resolution menu
         should_write = _flag_resolution_menu(s4_flagged_list)
         if should_write:
-            _write_final_results()
+            _write_final_results(stem)
             print("\nPipeline complete!")
         else:
             print("\nExiting without writing final results.")
