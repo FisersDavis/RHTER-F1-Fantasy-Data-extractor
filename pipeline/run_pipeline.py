@@ -31,7 +31,7 @@ validate_crop = _validate.validate_crop
 
 
 def _check_prerequisites():
-    """Verify data/raw/ has PNGs and GEMINI_API_KEY is set.
+    """Verify data/raw/ has PNGs and at least one API key is set.
 
     Returns list of error messages (empty if all OK).
     """
@@ -44,11 +44,19 @@ def _check_prerequisites():
         if not pngs:
             errors.append(f"No PNG files found in {DATA_RAW}")
 
-    if not os.environ.get("GEMINI_API_KEY"):
+    has_llama = bool(os.environ.get("LLAMA_CLOUD_API_KEY"))
+    has_gemini = bool(os.environ.get("GEMINI_API_KEY"))
+
+    if not has_llama and not has_gemini:
         errors.append(
-            "GEMINI_API_KEY environment variable is not set. "
-            "Get a free key at https://aistudio.google.com/apikey"
+            "No API keys set. Set at least one of:\n"
+            "  LLAMA_CLOUD_API_KEY — get at https://cloud.llamaindex.ai\n"
+            "  GEMINI_API_KEY — get at https://aistudio.google.com/apikey"
         )
+    elif has_llama and not has_gemini:
+        print("  NOTE: GEMINI_API_KEY not set — flagged crops will go to manual review")
+    elif not has_llama and has_gemini:
+        print("  NOTE: LLAMA_CLOUD_API_KEY not set — using Gemini-only mode (slow)")
 
     return errors
 
@@ -243,7 +251,7 @@ def main():
 
     # Stage 2 — Extract numbers
     print("-" * 40)
-    print("Stage 2: Extract numbers (Gemini Flash)")
+    print("Stage 2: Extract numbers (LlamaExtract + Gemini fallback)")
     print("-" * 40)
     s2_success, s2_flagged, s2_flagged_list = extract_all()
     print()
