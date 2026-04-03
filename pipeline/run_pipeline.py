@@ -230,8 +230,8 @@ def _verify_flagged(flagged_list):
     return results
 
 
-def _write_final_results():
-    """Collect all per-crop JSONs into data/final/results.json."""
+def _write_final_results(stem):
+    """Collect all per-crop JSONs into data/final/<stem>.json."""
     import re
     pattern = re.compile(r"^row(\d+)_col(\d+)\.json$")
 
@@ -246,7 +246,7 @@ def _write_final_results():
             all_crops.append(json.load(f))
 
     DATA_FINAL.mkdir(parents=True, exist_ok=True)
-    results_path = DATA_FINAL / "results.json"
+    results_path = DATA_FINAL / f"{stem}.json"
     with open(results_path, "w") as f:
         json.dump(all_crops, f, indent=2)
 
