@@ -31,7 +31,6 @@ import pipeline.run_pipeline as rp
 def test_prerequisites_no_screenshots_dir(tmp_path, monkeypatch):
     """Missing screenshots dir → error message, no screenshot path returned."""
     monkeypatch.setattr(rp, "DATA_SCREENSHOTS", tmp_path / "screenshots")
-    monkeypatch.setattr(rp, "DATA_RAW", tmp_path / "raw")
     # Simulate API key present so only the dir error fires
     monkeypatch.setenv("GEMINI_API_KEY", "fake")
 
@@ -46,7 +45,6 @@ def test_prerequisites_no_screenshot_files(tmp_path, monkeypatch):
     screenshots = tmp_path / "screenshots"
     screenshots.mkdir()
     monkeypatch.setattr(rp, "DATA_SCREENSHOTS", screenshots)
-    monkeypatch.setattr(rp, "DATA_RAW", tmp_path / "raw")
     monkeypatch.setenv("GEMINI_API_KEY", "fake")
 
     errors, screenshot_path = rp._check_prerequisites()
@@ -62,7 +60,6 @@ def test_prerequisites_screenshot_found(tmp_path, monkeypatch):
     webp = screenshots / "rw1_2026_r04.webp"
     webp.write_bytes(b"fake")
     monkeypatch.setattr(rp, "DATA_SCREENSHOTS", screenshots)
-    monkeypatch.setattr(rp, "DATA_RAW", tmp_path / "raw")
     monkeypatch.setenv("GEMINI_API_KEY", "fake")
 
     errors, screenshot_path = rp._check_prerequisites()
@@ -78,7 +75,6 @@ def test_prerequisites_no_api_keys(tmp_path, monkeypatch):
     screenshots.mkdir()
     (screenshots / "shot.webp").write_bytes(b"x")
     monkeypatch.setattr(rp, "DATA_SCREENSHOTS", screenshots)
-    monkeypatch.setattr(rp, "DATA_RAW", tmp_path / "raw")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("LLAMA_CLOUD_API_KEY", raising=False)
 
