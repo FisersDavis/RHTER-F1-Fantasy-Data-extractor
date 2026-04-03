@@ -3,11 +3,34 @@
 import json
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
 # Allow imports from project root
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+# Load the real validate_crop directly from its source file, bypassing
+# sys.modules entirely.  This is necessary because test_run_pipeline.py
+# installs a MagicMock at sys.modules["pipeline.04_validate"] at module
+# level, and importlib.import_module() would return that mock if this file
+# is collected after test_run_pipeline.py.
+import importlib.util as _ilu
+_validate_spec = _ilu.spec_from_file_location(
+    "pipeline._04_validate_real",
+    Path(__file__).resolve().parent.parent / "pipeline" / "04_validate.py",
+)
+_validate_mod = _ilu.module_from_spec(_validate_spec)
+_validate_spec.loader.exec_module(_validate_mod)
+_real_validate_crop = _validate_mod.validate_crop
+
+# Mock the heavy-dep pipeline modules so PIL / sklearn / numpy are not
+# required at test time.  04_validate is NOT mocked — the real validate_crop
+# must execute for these tests to be meaningful.
+sys.modules.setdefault("pipeline.00_crop", MagicMock())
+sys.modules.setdefault("pipeline.01_preprocess", MagicMock())
+sys.modules.setdefault("pipeline.02_extract", MagicMock())
+sys.modules.setdefault("pipeline.03_colors", MagicMock())
 
 
 def _write_crop_json(tmp_path, name, record):
@@ -50,6 +73,7 @@ def test_verify_flagged_all_ok(tmp_path, monkeypatch):
     """All flagged crops now pass validation — returns all-clear."""
     import pipeline.run_pipeline as rp
     monkeypatch.setattr(rp, "DATA_OUTPUT", tmp_path)
+    monkeypatch.setattr(rp, "validate_crop", _real_validate_crop)
 
     _write_crop_json(tmp_path, "row0_col00.json", _valid_record())
     _write_crop_json(tmp_path, "row0_col01.json", _valid_record())
@@ -63,6 +87,7 @@ def test_verify_flagged_still_flagged(tmp_path, monkeypatch):
     """A crop that still fails validation is reported with its flags."""
     import pipeline.run_pipeline as rp
     monkeypatch.setattr(rp, "DATA_OUTPUT", tmp_path)
+    monkeypatch.setattr(rp, "validate_crop", _real_validate_crop)
 
     _write_crop_json(tmp_path, "row0_col00.json", _invalid_record())
 
