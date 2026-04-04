@@ -16,3 +16,6 @@ pyvenv.cfg
 
 # Local data (not served)
 data/
+
+# Git worktrees
+.worktrees/
