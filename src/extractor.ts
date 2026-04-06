@@ -60,7 +60,12 @@ Re-read the image carefully. Return ONLY a JSON object with the same fields as b
 function parseGeminiResponse(raw: string): RawExtraction {
   // Strip markdown fences if present
   const cleaned = raw.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
-  const obj = JSON.parse(cleaned);
+  let obj: Record<string, unknown>;
+  try {
+    obj = JSON.parse(cleaned);
+  } catch {
+    throw new Error(`JSON parse failed. Raw response: ${raw.slice(0, 200)}`);
+  }
 
   const drivers: Driver[] = [];
   for (let i = 1; i <= 5; i++) {
@@ -122,15 +127,20 @@ async function callGemini(blob: Blob, apiKey: string, prompt: string): Promise<s
   }
 
   const json = await response.json() as GeminiResponse;
-  return json.candidates[0].content.parts[0].text;
+  const candidate = json.candidates?.[0];
+  if (!candidate?.content?.parts?.[0]?.text) {
+    throw new Error('Gemini returned no usable candidate (safety filter or empty response)');
+  }
+  return candidate.content.parts[0].text;
 }
 
 function extractionsAgree(a: RawExtraction, b: RawExtraction): boolean {
   const pa = a.percentiles, pb = b.percentiles;
   if (pa.p50 !== pb.p50) return false;
   if (pa.p05 !== pb.p05 || pa.p95 !== pb.p95) return false;
-  const da = a.drivers.map(d => d.name).join('');
-  const db = b.drivers.map(d => d.name).join('');
+  if (a.header.budget_required !== b.header.budget_required) return false;
+  const da = a.drivers.map(d => d.name + (d.multiplier ?? '')).join('');
+  const db = b.drivers.map(d => d.name + (d.multiplier ?? '')).join('');
   return da === db;
 }
 
@@ -178,11 +188,11 @@ export const rateLimiter = new RateLimiter(15);
  * Runs pass 1; if it disagrees with pass 2, marks the result needsReview.
  */
 export async function extractCrop(blob: Blob, apiKey: string): Promise<ExtractionResult> {
+  // One token per crop (two Gemini calls per crop, but rate-limited at crop granularity)
   await rateLimiter.acquire();
   const raw1 = await callGemini(blob, apiKey, PROMPT_PASS1);
   const ext1 = parseGeminiResponse(raw1);
 
-  await rateLimiter.acquire();
   const raw2 = await callGemini(blob, apiKey, PROMPT_PASS2);
   const ext2 = parseGeminiResponse(raw2);
 

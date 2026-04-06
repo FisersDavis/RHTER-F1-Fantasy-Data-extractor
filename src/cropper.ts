@@ -62,19 +62,19 @@ async function fileToCanvas(file: File): Promise<HTMLCanvasElement> {
 export async function cropScreenshot(file: File): Promise<CropBlobs> {
   const source = await fileToCanvas(file);
 
-  const blobs: Blob[][] = [];
-  for (let row = 0; row < GRID_ROWS; row++) {
-    const rowBlobs: Blob[] = [];
-    const [yStart, yEnd] = ROW_Y[row];
-    for (let col = 0; col < GRID_COLS; col++) {
-      const [xStart, xEnd] = COL_X[col];
-      const blob = await cropCell(source, xStart, yStart, xEnd - xStart, yEnd - yStart);
-      rowBlobs.push(blob);
-    }
-    blobs.push(rowBlobs);
-  }
+  const raw = await Promise.all(
+    Array.from({ length: GRID_ROWS }, (_, row) => {
+      const [yStart, yEnd] = ROW_Y[row];
+      return Promise.all(
+        Array.from({ length: GRID_COLS }, (_, col) => {
+          const [xStart, xEnd] = COL_X[col];
+          return cropCell(source, xStart, yStart, xEnd - xStart, yEnd - yStart);
+        }),
+      );
+    }),
+  );
 
-  return { raw: blobs };
+  return { raw };
 }
 
 /**
@@ -84,6 +84,7 @@ export async function cropScreenshot(file: File): Promise<CropBlobs> {
 export function drawGridOverlay(
   file: File,
   onReady: (canvas: HTMLCanvasElement) => void,
+  onError?: (err: Error) => void,
 ): void {
   createImageBitmap(file).then(bitmap => {
     const canvas = document.createElement('canvas');
@@ -91,28 +92,37 @@ export function drawGridOverlay(
     canvas.height = bitmap.height;
     canvas.style.maxWidth = '100%';
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      const err = new Error('Could not get 2D context for grid overlay');
+      if (onError) onError(err); else console.error(err);
+      return;
+    }
 
     ctx.drawImage(bitmap, 0, 0);
     bitmap.close();
 
-    // Draw row lines
     ctx.strokeStyle = 'rgba(98,238,183,0.8)';
     ctx.lineWidth = 1;
-    for (const [, yEnd] of ROW_Y) {
+
+    // Draw row boundaries (top edge of first row + bottom edge of each row)
+    const rowBoundaries = [ROW_Y[0][0], ...ROW_Y.map(([, yEnd]) => yEnd)];
+    for (const y of rowBoundaries) {
       ctx.beginPath();
-      ctx.moveTo(0, yEnd);
-      ctx.lineTo(canvas.width, yEnd);
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
       ctx.stroke();
     }
-    // Draw column lines
-    for (const [, xEnd] of COL_X) {
+    // Draw column boundaries (left edge of first column + right edge of each column)
+    const colBoundaries = [COL_X[0][0], ...COL_X.map(([, xEnd]) => xEnd)];
+    for (const x of colBoundaries) {
       ctx.beginPath();
-      ctx.moveTo(xEnd, 0);
-      ctx.lineTo(xEnd, canvas.height);
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
       ctx.stroke();
     }
 
     onReady(canvas);
+  }).catch(err => {
+    if (onError) onError(err as Error); else console.error(err);
   });
 }
