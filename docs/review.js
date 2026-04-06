@@ -8,7 +8,6 @@ const TEAM_COLORS = {
 };
 const TEAMS = Object.keys(TEAM_COLORS);
 
-// Module-level working copy of violins (post-correction)
 let violins = [];
 
 function computeGlobalBounds(data) {
@@ -21,7 +20,6 @@ function computeGlobalBounds(data) {
 }
 
 function makeConstructorBadge(violin, which) {
-    // which: 'cn1' | 'cn2'
     const wrapper = document.createElement('div');
     wrapper.className = 'constructor-badge';
 
@@ -61,7 +59,6 @@ function makeConstructorBadge(violin, which) {
     wrapper.addEventListener('click', (e) => {
         e.stopPropagation();
         const isOpen = dropdown.classList.contains('open');
-        // Close all other open dropdowns
         document.querySelectorAll('.constructor-dropdown.open').forEach(d => d.classList.remove('open'));
         if (!isOpen) dropdown.classList.add('open');
     });
@@ -69,23 +66,30 @@ function makeConstructorBadge(violin, which) {
     return wrapper;
 }
 
-function makeCard(violin, globalMin, globalMax) {
+function makeCard(violin, globalMin, globalMax, overBudget) {
     const card = document.createElement('div');
     card.className = 'violin-card';
     if (violin.flagged || violin.confidence !== 'high') card.classList.add('flagged');
-    if (violin._accepted) card.classList.add('accepted');
+    if (overBudget) card.classList.add('over-budget');
 
-    // Header row
-    const header = document.createElement('div');
-    header.className = 'card-header';
-    header.textContent = `${violin.header.budget_required}m  ${violin.header.avg_xpts}pts  +${violin.header.avg_budget_uplift}m`;
-    card.appendChild(header);
+    // Stat row: budget, avg_xpts, budget_uplift, $/pt
+    const ptsPerM = violin.header.budget_required > 0
+        ? (violin.header.avg_xpts / violin.header.budget_required).toFixed(1)
+        : '—';
+    const statRow = document.createElement('div');
+    statRow.className = 'card-stat-row';
+    const uplift = violin.header.avg_budget_uplift != null
+        ? `+${violin.header.avg_budget_uplift}M`
+        : '';
+    statRow.textContent = `${violin.header.budget_required}M  ${violin.header.avg_xpts}PTS  ${uplift}  ${ptsPerM}$/PT`;
+    card.appendChild(statRow);
 
-    // Chart
-    const chartWrap = document.createElement('div');
-    chartWrap.className = 'card-chart';
-    chartWrap.appendChild(createAreaChart(violin.percentiles, globalMin, globalMax, 100, 40));
-    card.appendChild(chartWrap);
+    // Percentile row
+    const pctRow = document.createElement('div');
+    pctRow.className = 'card-percentile-row';
+    const p = violin.percentiles;
+    pctRow.textContent = `P05:${p.p05}  P25:${p.p25}  P50:${p.p50}  P75:${p.p75}  P95:${p.p95}`;
+    card.appendChild(pctRow);
 
     // Drivers
     const driverRow = document.createElement('div');
@@ -100,7 +104,7 @@ function makeCard(violin, globalMin, globalMax) {
             input.type = 'text';
             input.value = driver.name;
             input.maxLength = 3;
-            input.style.cssText = 'width:3ch;background:#1a1a2e;color:#e0e0e0;border:1px solid #e94560;border-radius:2px;font-size:0.7rem;padding:0;text-align:center;';
+            input.style.cssText = 'width:3ch;background:#0a0a0a;color:#e0e0e0;border:1px solid #62eeb7;font-family:monospace;font-size:10px;padding:0;text-align:center;';
             span.replaceWith(input);
             input.focus();
             input.select();
@@ -112,7 +116,10 @@ function makeCard(violin, globalMin, globalMax) {
                 saveReviewedDataset(violins);
             };
             input.addEventListener('blur', commit);
-            input.addEventListener('keydown', (e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') input.replaceWith(span); });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') input.replaceWith(span);
+            });
         });
         driverRow.appendChild(span);
     }
@@ -125,56 +132,102 @@ function makeCard(violin, globalMin, globalMax) {
     cnRow.appendChild(makeConstructorBadge(violin, 'cn2'));
     card.appendChild(cnRow);
 
+    // Sparkline
+    const chartWrap = document.createElement('div');
+    chartWrap.appendChild(createAreaChart(violin.percentiles, globalMin, globalMax, 100, 30));
+    card.appendChild(chartWrap);
+
     return card;
 }
 
-function renderGrid(container, data) {
+function renderGrid(container, data, budget) {
+    container.innerHTML = '';
     const { globalMin, globalMax } = computeGlobalBounds(data);
 
-    const ROWS = [
-        { label: 'Budget Tier 1', items: data.filter(v => v.row === 0).sort((a, b) => a.col - b.col) },
-        { label: 'Budget Tier 2', items: data.filter(v => v.row === 1).sort((a, b) => a.col - b.col) },
-        { label: 'Budget Tier 3', items: data.filter(v => v.row === 2).sort((a, b) => a.col - b.col) },
-    ];
+    // Sort by original order (row then col), partition by budget
+    const sorted = [...data].sort((a, b) => a.row - b.row || a.col - b.col);
+    const affordable = sorted.filter(v => v.header.budget_required <= budget);
+    const overBudget = sorted.filter(v => v.header.budget_required > budget);
 
-    for (const tier of ROWS) {
-        const tierLabel = document.createElement('div');
-        tierLabel.className = 'tier-label';
-        tierLabel.textContent = tier.label;
-        container.appendChild(tierLabel);
+    const grid = document.createElement('div');
+    grid.className = 'violin-grid';
 
-        const grid = document.createElement('div');
-        grid.className = 'violin-grid';
-        for (const v of tier.items) {
-            grid.appendChild(makeCard(v, globalMin, globalMax));
-        }
-        container.appendChild(grid);
+    for (const v of affordable) {
+        grid.appendChild(makeCard(v, globalMin, globalMax, false));
     }
+    for (const v of overBudget) {
+        grid.appendChild(makeCard(v, globalMin, globalMax, true));
+    }
+
+    container.appendChild(grid);
 }
 
 function initReview(container) {
     const section = document.createElement('section');
 
-    // Import area
-    const importHeading = document.createElement('h2');
-    importHeading.textContent = 'Import Pipeline JSON';
-    section.appendChild(importHeading);
+    // ── Top bar ──
+    const topbar = document.createElement('div');
+    topbar.className = 'review-topbar';
+
+    // Budget field
+    const budgetField = document.createElement('div');
+    budgetField.className = 'topbar-field';
+
+    const budgetLabel = document.createElement('span');
+    budgetLabel.className = 'topbar-label';
+    budgetLabel.textContent = 'BUDGET (M)';
+
+    const budgetInput = document.createElement('input');
+    budgetInput.type = 'number';
+    budgetInput.step = '0.1';
+    budgetInput.min = '0';
+    budgetInput.style.width = '80px';
+    budgetInput.value = localStorage.getItem('userBudget') || '105';
+
+    budgetField.appendChild(budgetLabel);
+    budgetField.appendChild(budgetInput);
+    topbar.appendChild(budgetField);
+
+    // JSON import field
+    const importField = document.createElement('div');
+    importField.className = 'topbar-import';
+
+    const importFieldLabel = document.createElement('span');
+    importFieldLabel.className = 'topbar-label';
+    importFieldLabel.textContent = 'LOAD JSON';
+
+    const importRow = document.createElement('div');
+    importRow.className = 'topbar-import-row';
 
     const pasteArea = document.createElement('textarea');
-    pasteArea.placeholder = 'Paste pipeline JSON array here, or drag and drop a .json file…';
-    pasteArea.style.cssText = 'width:100%;height:120px;background:#16213e;color:#e0e0e0;border:1px solid #0f3460;border-radius:4px;padding:0.5rem;font-family:monospace;font-size:0.8rem;resize:vertical;';
-    section.appendChild(pasteArea);
+    pasteArea.placeholder = 'Paste or drop pipeline JSON…';
 
     const importBtn = document.createElement('button');
     importBtn.className = 'btn';
-    importBtn.textContent = 'Load JSON';
-    importBtn.style.marginTop = '0.5rem';
-    section.appendChild(importBtn);
+    importBtn.textContent = 'LOAD JSON';
 
+    importRow.appendChild(pasteArea);
+    importRow.appendChild(importBtn);
+    importField.appendChild(importFieldLabel);
+    importField.appendChild(importRow);
+    topbar.appendChild(importField);
+
+    section.appendChild(topbar);
+
+    // Summary line
     const summaryEl = document.createElement('div');
+    summaryEl.className = 'review-summary';
     section.appendChild(summaryEl);
 
-    // File drop
+    // Error line
+    const errorEl = document.createElement('div');
+    section.appendChild(errorEl);
+
+    // Grid container
+    const gridContainer = document.createElement('div');
+    section.appendChild(gridContainer);
+
+    // Drag-and-drop onto textarea
     pasteArea.addEventListener('dragover', (e) => e.preventDefault());
     pasteArea.addEventListener('drop', (e) => {
         e.preventDefault();
@@ -185,94 +238,56 @@ function initReview(container) {
         reader.readAsText(file);
     });
 
-    // Bulk actions
-    const bulkBar = document.createElement('div');
-    bulkBar.className = 'bulk-actions';
-    bulkBar.style.display = 'none';
-
-    const acceptAllBtn = document.createElement('button');
-    acceptAllBtn.className = 'btn';
-    acceptAllBtn.textContent = 'Accept all unflagged';
-
-    const clearFlagsBtn = document.createElement('button');
-    clearFlagsBtn.className = 'btn';
-    clearFlagsBtn.textContent = 'Clear all flags';
-
-    const proceedBtn = document.createElement('button');
-    proceedBtn.className = 'btn';
-    proceedBtn.textContent = 'Proceed to Analysis';
-    proceedBtn.disabled = true;
-
-    bulkBar.appendChild(acceptAllBtn);
-    bulkBar.appendChild(clearFlagsBtn);
-    bulkBar.appendChild(proceedBtn);
-    section.appendChild(bulkBar);
-
-    // Grid container
-    const gridContainer = document.createElement('div');
-    section.appendChild(gridContainer);
-
-    // Close dropdowns on outside click (registered once)
+    // Close dropdowns on outside click (registered once per init)
     document.addEventListener('click', () => {
         document.querySelectorAll('.constructor-dropdown.open').forEach(d => d.classList.remove('open'));
     });
 
+    function getBudget() {
+        return parseFloat(budgetInput.value) || Infinity;
+    }
+
+    function updateSummary() {
+        if (!violins.length) { summaryEl.textContent = ''; return; }
+        const budget = getBudget();
+        const affordable = violins.filter(v => v.header.budget_required <= budget).length;
+        const over = violins.length - affordable;
+        summaryEl.textContent = `${violins.length} VIOLINS — ${affordable} AFFORDABLE — ${over} OVER BUDGET`;
+    }
+
     function loadData(data) {
-        violins = data.map(v => ({ ...v, _accepted: false }));
-        summaryEl.className = 'import-summary';
-        const flaggedCount = data.filter(v => v.flagged || v.confidence !== 'high').length;
-        summaryEl.textContent = `✓ ${data.length} violins loaded, ${flaggedCount} flagged`;
-        bulkBar.style.display = 'flex';
-        gridContainer.innerHTML = '';
-        renderGrid(gridContainer, violins);
-        updateProceedBtn();
+        violins = data;
+        errorEl.textContent = '';
+        errorEl.className = '';
+        updateSummary();
+        renderGrid(gridContainer, violins, getBudget());
         saveReviewedDataset(violins);
     }
 
-    function updateProceedBtn() {
-        proceedBtn.disabled = !violins.some(v => v._accepted);
-    }
+    // Budget change: persist to localStorage and re-render
+    budgetInput.addEventListener('input', () => {
+        localStorage.setItem('userBudget', budgetInput.value);
+        updateSummary();
+        if (violins.length) renderGrid(gridContainer, violins, getBudget());
+    });
 
-    // Try loading persisted import on init
-    const persisted = getImportedViolins();
-    if (persisted) loadData(persisted);
-
+    // Import button
     importBtn.addEventListener('click', () => {
-        summaryEl.textContent = '';
-        summaryEl.className = '';
+        errorEl.textContent = '';
+        errorEl.className = '';
         try {
             const parsed = JSON.parse(pasteArea.value.trim());
             importJSON(parsed);
             loadData(parsed);
         } catch (err) {
-            summaryEl.className = 'import-error';
-            summaryEl.textContent = `Error: ${err.message}`;
+            errorEl.className = 'import-error';
+            errorEl.textContent = `ERROR: ${err.message}`;
         }
     });
 
-    acceptAllBtn.addEventListener('click', () => {
-        for (const v of violins) {
-            if (!v.flagged && v.confidence === 'high') v._accepted = true;
-        }
-        gridContainer.innerHTML = '';
-        renderGrid(gridContainer, violins);
-        updateProceedBtn();
-        saveReviewedDataset(violins);
-    });
-
-    clearFlagsBtn.addEventListener('click', () => {
-        for (const v of violins) {
-            v.flagged = false;
-        }
-        gridContainer.innerHTML = '';
-        renderGrid(gridContainer, violins);
-        saveReviewedDataset(violins);
-    });
-
-    proceedBtn.addEventListener('click', () => {
-        // Navigation is handled by app.js — dispatch a custom event
-        document.dispatchEvent(new CustomEvent('navigate', { detail: 'analysis' }));
-    });
+    // Auto-load persisted import on init
+    const persisted = getImportedViolins();
+    if (persisted) loadData(persisted);
 
     container.appendChild(section);
 }
