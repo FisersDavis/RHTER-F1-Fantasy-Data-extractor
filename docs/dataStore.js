@@ -128,4 +128,29 @@ function showTable(section, key) {
     section.appendChild(wrapper);
 }
 
-export { initDataStore, getDatasets, getDataset, getUnifiedTable, deleteDataset };
+function importJSON(array) {
+    if (!Array.isArray(array)) throw new Error('Expected an array');
+    const flagged = array.filter(v => v.flagged || v.confidence !== 'high').length;
+    const key = 'pipeline_import_' + Date.now();
+    localStorage.setItem(key, JSON.stringify(array));
+    localStorage.setItem('pipeline_import_key', key);
+    return { count: array.length, flagged };
+}
+
+function getImportedDataset() {
+    const key = localStorage.getItem('pipeline_import_key');
+    if (!key) return null;
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+}
+
+function saveReviewedDataset(array) {
+    localStorage.setItem('reviewed_dataset', JSON.stringify(array));
+}
+
+function getReviewedDataset() {
+    const raw = localStorage.getItem('reviewed_dataset');
+    return raw ? JSON.parse(raw) : null;
+}
+
+export { initDataStore, getDatasets, getDataset, getUnifiedTable, deleteDataset, importJSON, getImportedDataset, saveReviewedDataset, getReviewedDataset };
