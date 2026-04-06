@@ -17,6 +17,10 @@ pyvenv.cfg
 # Local data (not served)
 data/
 
+# Node
+node_modules/
+dist/
+
 # Git worktrees
 .worktrees/
 .gitnexus
