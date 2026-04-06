@@ -43,7 +43,7 @@ function initDataStore(container) {
 
     for (const ds of datasets) {
         const card = document.createElement('div');
-        card.className = 'config-section';
+        card.className = 'data-card';
 
         const title = document.createElement('strong');
         title.textContent = new Date(ds.date).toLocaleString();
@@ -90,20 +90,13 @@ function showTable(section, key) {
     wrapper.className = 'data-table-container';
 
     const table = document.createElement('table');
-    table.style.width = '100%';
-    table.style.borderCollapse = 'collapse';
-    table.style.marginTop = '1rem';
-    table.style.fontSize = '0.8rem';
 
     const headers = Object.keys(rows[0]);
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     for (const h of headers) {
         const th = document.createElement('th');
-        th.textContent = h;
-        th.style.borderBottom = '1px solid #0f3460';
-        th.style.padding = '0.3rem';
-        th.style.textAlign = 'left';
+        th.textContent = h.toUpperCase();
         headerRow.appendChild(th);
     }
     thead.appendChild(headerRow);
@@ -116,8 +109,6 @@ function showTable(section, key) {
             const td = document.createElement('td');
             const val = row[h];
             td.textContent = Array.isArray(val) ? val.join(', ') : (val ?? '');
-            td.style.padding = '0.3rem';
-            td.style.borderBottom = '1px solid #1a1a2e';
             tr.appendChild(td);
         }
         tbody.appendChild(tr);
