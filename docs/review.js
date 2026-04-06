@@ -10,6 +10,11 @@ const TEAMS = Object.keys(TEAM_COLORS);
 
 let violins = [];
 
+// Close dropdowns on outside click
+document.addEventListener('click', () => {
+    document.querySelectorAll('.constructor-dropdown.open').forEach(d => d.classList.remove('open'));
+});
+
 function computeGlobalBounds(data) {
     let min = Infinity, max = -Infinity;
     for (const v of data) {
@@ -163,6 +168,7 @@ function renderGrid(container, data, budget) {
 }
 
 function initReview(container) {
+    violins = [];
     const section = document.createElement('section');
 
     // ── Top bar ──
@@ -236,11 +242,6 @@ function initReview(container) {
         const reader = new FileReader();
         reader.onload = () => { pasteArea.value = reader.result; };
         reader.readAsText(file);
-    });
-
-    // Close dropdowns on outside click (registered once per init)
-    document.addEventListener('click', () => {
-        document.querySelectorAll('.constructor-dropdown.open').forEach(d => d.classList.remove('open'));
     });
 
     function getBudget() {
