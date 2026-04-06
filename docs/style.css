@@ -174,3 +174,234 @@ main {
     color: #a0a0b0;
     margin: 0.5rem 0;
 }
+
+/* ── Review tab ── */
+.tier-label {
+    font-size: 0.75rem;
+    color: #a0a0b0;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 1.5rem 0 0.5rem;
+}
+
+.violin-grid {
+    display: grid;
+    grid-template-columns: repeat(24, 1fr);
+    gap: 4px;
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 1400px) { .violin-grid { grid-template-columns: repeat(12, 1fr); } }
+@media (max-width: 900px)  { .violin-grid { grid-template-columns: repeat(6, 1fr); } }
+@media (max-width: 500px)  { .violin-grid { grid-template-columns: repeat(3, 1fr); } }
+
+.violin-card {
+    background: #16213e;
+    border: 1px solid #0f3460;
+    border-radius: 6px;
+    padding: 6px;
+    font-size: 0.7rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.violin-card.flagged {
+    border-color: #f59e0b;
+}
+
+.violin-card.accepted {
+    border-color: #10b981;
+}
+
+.violin-card.over-budget {
+    opacity: 0.4;
+}
+
+.violin-card .card-header {
+    color: #a0a0b0;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.violin-card .card-chart {
+    /* chart SVG fills this naturally */
+}
+
+.violin-card .card-drivers {
+    color: #e0e0e0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+}
+
+.violin-card .driver-name {
+    cursor: pointer;
+    padding: 1px 3px;
+    border-radius: 2px;
+}
+
+.violin-card .driver-name:hover {
+    background: #0f3460;
+}
+
+.violin-card .driver-name.multiplier {
+    color: #f59e0b;
+}
+
+.violin-card .card-constructors {
+    display: flex;
+    gap: 4px;
+}
+
+.constructor-badge {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background: #0f3460;
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-size: 0.65rem;
+    cursor: pointer;
+    position: relative;
+}
+
+.constructor-badge .color-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.constructor-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 100;
+    background: #16213e;
+    border: 1px solid #0f3460;
+    border-radius: 4px;
+    padding: 4px 0;
+    min-width: 80px;
+    display: none;
+}
+
+.constructor-dropdown.open {
+    display: block;
+}
+
+.constructor-dropdown button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    background: none;
+    border: none;
+    color: #e0e0e0;
+    padding: 3px 8px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    text-align: left;
+}
+
+.constructor-dropdown button:hover {
+    background: #0f3460;
+}
+
+/* ── Bulk actions bar ── */
+.bulk-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.import-summary {
+    font-size: 0.85rem;
+    color: #10b981;
+    margin: 0.5rem 0 1rem;
+}
+
+.import-error {
+    font-size: 0.85rem;
+    color: #e94560;
+    margin: 0.5rem 0;
+}
+
+/* ── Analysis tab ── */
+.analysis-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.analysis-controls label {
+    font-size: 0.85rem;
+    color: #a0a0b0;
+}
+
+.analysis-controls input,
+.analysis-controls select {
+    background: #16213e;
+    border: 1px solid #0f3460;
+    color: #e0e0e0;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.ranked-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ranked-entry {
+    background: #16213e;
+    border: 1px solid #0f3460;
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: grid;
+    grid-template-columns: 2rem 120px 1fr auto;
+    gap: 12px;
+    align-items: center;
+}
+
+.ranked-entry.top-pick {
+    border-color: #e94560;
+}
+
+.ranked-entry.over-budget {
+    opacity: 0.4;
+    order: 999;
+}
+
+.rank-number {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #e94560;
+}
+
+.kelly-bar-wrap {
+    height: 6px;
+    background: #0f3460;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.kelly-bar-fill {
+    height: 100%;
+    background: #e94560;
+    border-radius: 3px;
+}
+
+.ranked-entry .score-text {
+    font-size: 0.75rem;
+    color: #a0a0b0;
+}
