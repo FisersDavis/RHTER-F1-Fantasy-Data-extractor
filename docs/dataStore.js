@@ -128,4 +128,30 @@ function showTable(section, key) {
     section.appendChild(wrapper);
 }
 
-export { initDataStore, getDatasets, getDataset, getUnifiedTable, deleteDataset };
+function importJSON(array) {
+    if (!Array.isArray(array)) throw new Error('Expected an array');
+    for (const item of array) {
+        if (item.row == null || item.col == null || !item.header || !item.percentiles || !item.drivers || !item.constructors) {
+            throw new Error(`Invalid violin object at row=${item.row} col=${item.col}`);
+        }
+    }
+    localStorage.setItem('importedViolins', JSON.stringify(array));
+    const flagged = array.filter(v => v.flagged || v.confidence !== 'high').length;
+    return { count: array.length, flagged };
+}
+
+function saveReviewedDataset(array) {
+    localStorage.setItem('reviewedViolins', JSON.stringify(array));
+}
+
+function getReviewedDataset() {
+    const raw = localStorage.getItem('reviewedViolins');
+    return raw ? JSON.parse(raw) : null;
+}
+
+function getImportedViolins() {
+    const raw = localStorage.getItem('importedViolins');
+    return raw ? JSON.parse(raw) : null;
+}
+
+export { initDataStore, getDatasets, getDataset, getUnifiedTable, deleteDataset, importJSON, saveReviewedDataset, getReviewedDataset, getImportedViolins };
