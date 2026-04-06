@@ -88,7 +88,8 @@ export function extractConstructors(canvas: HTMLCanvasElement): { cn1: string; c
     const pixelIdx = i / 4;
     const px = pixelIdx % sampleW;
 
-    // Keep colored pixels (saturation > 0.5) or bright white (all channels > 200)
+    // Keep colored pixels (saturation > 0.5) or bright white (HAA — all channels > 200,
+    // saturation < 0.15 to exclude near-white UI chrome and anti-aliased edges)
     const { s } = rgbToHsl(r, g, b);
     const isColored = s > 0.5;
     const isWhite   = r > 200 && g > 200 && b > 200 && s < 0.15;
@@ -101,26 +102,27 @@ export function extractConstructors(canvas: HTMLCanvasElement): { cn1: string; c
     }
   }
 
-  function nearestTeam(sums: RGB, count: number): string {
-    if (count === 0) return 'UNK';
-    const avg: Lab = rgbToLab(
-      Math.round(sums.r / count),
-      Math.round(sums.g / count),
-      Math.round(sums.b / count),
-    );
-    let best = TEAMS[0];
-    let bestDist = Infinity;
-    for (const team of TEAMS) {
-      const ref = CONSTRUCTOR_LAB[team];
-      if (!ref) continue;
-      const dist = deltaE76(avg, ref);
-      if (dist < bestDist) { bestDist = dist; best = team; }
-    }
-    return best;
-  }
-
   return {
     cn1: nearestTeam(leftSums,  leftCount),
     cn2: nearestTeam(rightSums, rightCount),
   };
+}
+
+/** Returns the nearest constructor team code for a given RGB sum + pixel count. */
+function nearestTeam(sums: RGB, count: number): string {
+  if (count === 0) return 'UNK';
+  const avg: Lab = rgbToLab(
+    Math.round(sums.r / count),
+    Math.round(sums.g / count),
+    Math.round(sums.b / count),
+  );
+  let best = TEAMS[0];
+  let bestDist = Infinity;
+  for (const team of TEAMS) {
+    const ref = CONSTRUCTOR_LAB[team];
+    if (!ref) continue;
+    const dist = deltaE76(avg, ref);
+    if (dist < bestDist) { bestDist = dist; best = team; }
+  }
+  return best;
 }

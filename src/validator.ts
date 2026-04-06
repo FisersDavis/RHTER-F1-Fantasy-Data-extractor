@@ -2,6 +2,7 @@ import { TEAMS } from './config.js';
 import type { ViolinCrop, Percentiles } from './types.js';
 
 const DRIVER_RE = /^[A-Z]{3}$/;
+// 2X is the documented multiplier; 3X is included defensively in case RHTER adds it
 const VALID_MULTIPLIERS = new Set(['2X', '3X', null]);
 const SCORE_MIN = 0;
 const SCORE_MAX = 1000;
