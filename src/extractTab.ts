@@ -63,13 +63,16 @@ export function initExtractTab(container: HTMLElement): void {
     runBtn.disabled = !fileInput.files?.length;
 
     // Show grid overlay preview
-    previewWrap.innerHTML = '';
+    while (previewWrap.firstChild) previewWrap.removeChild(previewWrap.firstChild);
     const file = fileInput.files?.[0];
     if (!file) return;
     drawGridOverlay(
       file,
       (canvas) => { previewWrap.appendChild(canvas); },
-      (err) => { console.error('Grid overlay failed:', err); },
+      (err) => {
+        errorEl.className = 'import-error';
+        errorEl.textContent = `Grid preview failed: ${(err as Error).message}`;
+      },
     );
   });
 

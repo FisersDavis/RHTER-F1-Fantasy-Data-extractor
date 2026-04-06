@@ -399,3 +399,9 @@ select:focus {
     border-bottom: 1px solid #2a2a2a;
     color: #e0e0e0;
 }
+
+.grid-preview-wrap {
+    max-width: 100%;
+    overflow: hidden;
+    border: 1px solid #2a2a2a;
+}
