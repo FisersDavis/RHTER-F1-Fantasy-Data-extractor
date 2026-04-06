@@ -18,17 +18,17 @@ export const TEAMS = Object.keys(CONSTRUCTOR_COLORS);
 // Lab reference colors for Delta-E matching (L, a, b)
 // Derived from the hex values above via standard sRGB→Lab transform
 export const CONSTRUCTOR_LAB: Record<string, [number, number, number]> = {
-  MCL: [60.73,  28.28,  62.55],
-  MER: [78.82, -32.07,  -4.34],
-  RED: [ 5.27,   7.74, -22.87],
-  FER: [37.21,  57.00,  45.71],
-  WIL: [29.57,  32.33, -75.64],
-  VRB: [70.30,  -8.15, -27.73],
-  AST: [25.90, -26.39,  10.69],
-  HAA: [100.0,   0.00,   0.00],
-  AUD: [18.24,  26.95,  -2.35],
-  ALP: [72.68,  30.66,  -9.47],
-  CAD: [76.61,   0.00,   0.00],
+  MCL: [ 68.46,  39.35,  74.86],
+  MER: [ 75.95, -47.29,  -2.29],
+  RED: [ 13.18,  21.15, -42.18],
+  FER: [ 45.94,  71.64,  60.11],
+  WIL: [ 44.28,  44.59, -87.96],
+  VRB: [ 70.39,  -9.72, -31.11],
+  AST: [ 40.98, -37.14,  13.68],
+  HAA: [100.00,   0.00,   0.00],
+  AUD: [ 24.61,  47.74,  14.01],
+  ALP: [ 71.02,  51.37,  -6.90],
+  CAD: [ 77.70,   0.00,   0.00],
 };
 
 // Grid layout for 2000×1124px reference screenshot
