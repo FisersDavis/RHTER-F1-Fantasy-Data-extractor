@@ -131,11 +131,6 @@ function makeCard(violin, globalMin, globalMax) {
 function renderGrid(container, data) {
     const { globalMin, globalMax } = computeGlobalBounds(data);
 
-    // Close dropdowns on outside click
-    document.addEventListener('click', () => {
-        document.querySelectorAll('.constructor-dropdown.open').forEach(d => d.classList.remove('open'));
-    }, { once: false });
-
     const ROWS = [
         { label: 'Budget Tier 1', items: data.filter(v => v.row === 0).sort((a, b) => a.col - b.col) },
         { label: 'Budget Tier 2', items: data.filter(v => v.row === 1).sort((a, b) => a.col - b.col) },
@@ -217,6 +212,11 @@ function initReview(container) {
     const gridContainer = document.createElement('div');
     section.appendChild(gridContainer);
 
+    // Close dropdowns on outside click (registered once)
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.constructor-dropdown.open').forEach(d => d.classList.remove('open'));
+    });
+
     function loadData(data) {
         violins = data.map(v => ({ ...v, _accepted: false }));
         summaryEl.className = 'import-summary';
@@ -242,7 +242,7 @@ function initReview(container) {
         summaryEl.className = '';
         try {
             const parsed = JSON.parse(pasteArea.value.trim());
-            const result = importJSON(parsed);
+            importJSON(parsed);
             loadData(parsed);
         } catch (err) {
             summaryEl.className = 'import-error';
