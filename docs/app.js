@@ -1,13 +1,15 @@
-import { initCropper } from './cropper.js';
 import { initDataStore } from './dataStore.js';
 import { initReview } from './review.js';
 import { initAnalysis } from './analysis.js';
 
-const VIEWS = ['cropper', 'review', 'analysis', 'data'];
+const VIEWS = ['review', 'analysis', 'data'];
 
 const state = {
-    currentView: localStorage.getItem('currentView') || 'cropper',
+    currentView: localStorage.getItem('currentView') || 'review',
 };
+
+// Guard against a stale 'cropper' value in localStorage
+if (!VIEWS.includes(state.currentView)) state.currentView = 'review';
 
 function saveState() {
     localStorage.setItem('currentView', state.currentView);
@@ -22,10 +24,10 @@ function navigateTo(view) {
 function renderNav() {
     const nav = document.getElementById('main-nav');
     nav.innerHTML = '';
-    const labels = { cropper: 'Cropper', review: 'Review', analysis: 'Analysis', data: 'Data' };
+    const labels = { review: 'REVIEW', analysis: 'ANALYSIS', data: 'DATA' };
     for (const view of VIEWS) {
         const btn = document.createElement('button');
-        btn.textContent = labels[view] || view;
+        btn.textContent = labels[view];
         if (view === state.currentView) btn.classList.add('active');
         btn.addEventListener('click', () => navigateTo(view));
         nav.appendChild(btn);
@@ -38,9 +40,6 @@ function render() {
     renderNav();
 
     switch (state.currentView) {
-        case 'cropper':
-            initCropper(app);
-            break;
         case 'review':
             initReview(app);
             break;
@@ -53,7 +52,6 @@ function render() {
     }
 }
 
-// Allow other modules to trigger navigation (e.g. "Proceed to Analysis" button)
 document.addEventListener('navigate', (e) => navigateTo(e.detail));
 
 render();
