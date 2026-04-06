@@ -1,10 +1,10 @@
 /**
  * createAreaChart — pure function, no state, no side effects.
- * Returns an SVG element showing a percentile area shape.
+ * Returns an SVG element showing a stepped percentile polyline.
  *
  * @param {{ p05, p25, p50, p75, p95 }} percentiles
- * @param {number} globalMin  lowest score across all 72 violins
- * @param {number} globalMax  highest score across all 72 violins
+ * @param {number} globalMin  lowest score across all violins
+ * @param {number} globalMax  highest score across all violins
  * @param {number} width      SVG width in px
  * @param {number} height     SVG height in px
  * @returns {SVGSVGElement}
@@ -27,11 +27,18 @@ function createAreaChart(percentiles, globalMin, globalMax, width, height) {
         return height - (rank / 100) * height;
     }
 
-    // Area path: forward along curve, then back along the baseline
-    const top = points.map(([score, rank]) => `${toX(score).toFixed(1)},${toY(rank).toFixed(1)}`);
-    const bottomLeft = `${toX(percentiles.p05).toFixed(1)},${height}`;
-    const bottomRight = `${toX(percentiles.p95).toFixed(1)},${height}`;
-    const d = `M ${top[0]} L ${top.slice(1).join(' L ')} L ${bottomRight} L ${bottomLeft} Z`;
+    // Stepped polyline: horizontal then vertical segments
+    let d = '';
+    for (let i = 0; i < points.length; i++) {
+        const x = toX(points[i][0]).toFixed(1);
+        const y = toY(points[i][1]).toFixed(1);
+        if (i === 0) {
+            d += `M ${x},${y}`;
+        } else {
+            // Step: go horizontal to new x at previous y, then vertical to new y
+            d += ` H ${x} V ${y}`;
+        }
+    }
 
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');
@@ -39,12 +46,12 @@ function createAreaChart(percentiles, globalMin, globalMax, width, height) {
     svg.setAttribute('height', height);
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
 
-    const area = document.createElementNS(ns, 'path');
-    area.setAttribute('d', d);
-    area.setAttribute('fill', 'rgba(233,69,96,0.25)');
-    area.setAttribute('stroke', '#e94560');
-    area.setAttribute('stroke-width', '1.5');
-    svg.appendChild(area);
+    const line = document.createElementNS(ns, 'path');
+    line.setAttribute('d', d);
+    line.setAttribute('fill', 'none');
+    line.setAttribute('stroke', '#62eeb7');
+    line.setAttribute('stroke-width', '1.5');
+    svg.appendChild(line);
 
     return svg;
 }
