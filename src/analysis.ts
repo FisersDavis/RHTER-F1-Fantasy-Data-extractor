@@ -1,10 +1,6 @@
 import { createAreaChart } from './areaChart.js';
 import { getReviewedDataset } from './dataStore.js';
-import { CONSTRUCTOR_COLORS } from './config.js';
 import type { ViolinCrop, Percentiles } from './types.js';
-
-// CONSTRUCTOR_COLORS imported to maintain the same dependency graph as the JS version
-void CONSTRUCTOR_COLORS;
 
 interface RankedEntry {
   violin: ViolinCrop;
