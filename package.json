@@ -1,0 +1,13 @@
+{
+  "name": "rhter-f1-extractor",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "esbuild src/app.ts --bundle --outfile=docs/app.js --watch",
+    "build": "esbuild src/app.ts --bundle --minify --outfile=docs/app.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0"
+  }
+}
