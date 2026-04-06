@@ -2,14 +2,16 @@ import { initDataStore } from './dataStore.js';
 import { initReview } from './review.js';
 import { initAnalysis } from './analysis.js';
 import { initSettingsPanel } from './settingsPanel.js';
+import { initExtractTab } from './extractTab.js';
 
-const VIEWS = ['review', 'analysis', 'data', 'settings'] as const;
+const VIEWS = ['review', 'analysis', 'data', 'extract', 'settings'] as const;
 type View = typeof VIEWS[number];
 
 const LABELS: Record<View, string> = {
   review: 'REVIEW',
   analysis: 'ANALYSIS',
   data: 'DATA',
+  extract: 'EXTRACT',
   settings: 'SETTINGS',
 };
 
@@ -51,6 +53,7 @@ function render(): void {
     case 'review':    initReview(app);         break;
     case 'analysis':  initAnalysis(app);        break;
     case 'data':      initDataStore(app);       break;
+    case 'extract':   initExtractTab(app);       break;
     case 'settings':  initSettingsPanel(app);   break;
   }
 }
