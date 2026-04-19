@@ -147,7 +147,7 @@
   }
 
   // src/extractor.ts
-  var GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+  var GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent";
   var PROMPT_PASS1 = `You are extracting structured data from an F1 fantasy violin plot image.
 The image shows one violin plot with:
 - A header row at the top containing: budget required (M), avg_xpts, avg_xpts_dollar_impact, avg_budget_uplift

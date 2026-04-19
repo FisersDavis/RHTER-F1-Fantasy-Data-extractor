@@ -13,7 +13,7 @@ interface GeminiResponse {
   }>;
 }
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent';
 
 const PROMPT_PASS1 = `You are extracting structured data from an F1 fantasy violin plot image.
 The image shows one violin plot with:
