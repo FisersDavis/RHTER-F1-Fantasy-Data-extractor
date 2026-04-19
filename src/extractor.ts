@@ -115,11 +115,24 @@ async function callGemini(blob: Blob, apiKey: string, prompt: string): Promise<s
     generationConfig: { temperature: 0, maxOutputTokens: 512 },
   };
 
-  const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+  let response: Response;
+  try {
+    response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') {
+      throw new Error('Gemini API request timed out after 30s');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     const err = await response.text();
@@ -181,7 +194,8 @@ class RateLimiter {
   }
 }
 
-export const rateLimiter = new RateLimiter(15);
+// 7 tokens/min: each crop makes 2 Gemini calls, so 7 crops/min = 14 RPM — safely under the 15 RPM free tier limit.
+export const rateLimiter = new RateLimiter(7);
 
 /**
  * Extracts structured data from a single preprocessed crop PNG Blob.

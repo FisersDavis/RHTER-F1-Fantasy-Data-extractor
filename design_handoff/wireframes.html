@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RHTER — Wireframe Explorations</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #111;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+  }
+
+  /* ─── META NAV ─── */
+  .meta-nav {
+    background: #0a0a0a;
+    border-bottom: 1px solid #333;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .meta-nav .logo {
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: #666;
+    text-transform: uppercase;
+  }
+  .meta-nav .logo span { color: #fff; }
+  .variation-tabs {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+  }
+  .vtab {
+    padding: 6px 16px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px solid #333;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .vtab:hover { border-color: #666; color: #ccc; }
+  .vtab.active { background: #fff; color: #000; border-color: #fff; }
+  .screen-tabs {
+    display: flex;
+    gap: 2px;
+  }
+  .stab {
+    padding: 6px 14px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px dashed #333;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .stab:hover { color: #999; border-color: #555; }
+  .stab.active { color: #fff; border-color: #fff; border-style: solid; }
+
+  /* ─── VARIATION PANELS ─── */
+  .variation { display: none; }
+  .variation.active { display: block; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ─── WIREFRAME CANVAS ─── */
+  .wf-canvas {
+    padding: 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .wf-label {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #444;
+    margin-bottom: 4px;
+  }
+  .wf-note {
+    font-size: 10px;
+    color: #555;
+    font-style: italic;
+    margin-top: 4px;
+  }
+
+  /* ─── WIREFRAME PRIMITIVES ─── */
+  .box {
+    border: 1px solid #333;
+    padding: 16px;
+    position: relative;
+  }
+  .box.dashed { border-style: dashed; border-color: #444; }
+  .box.accent { border-color: #e8401c; }
+  .box-label {
+    position: absolute;
+    top: -9px;
+    left: 10px;
+    background: #111;
+    padding: 0 6px;
+    font-size: 8px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #555;
+  }
+  .box-label.accent { color: #e8401c; }
+  .ph {
+    background: #1a1a1a;
+    border: 1px dashed #2a2a2a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #333;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  /* heading */
+  .wf-h {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 2px;
+  }
+  .wf-big {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .wf-sm { font-size: 10px; color: #555; }
+  .dim { color: #444; }
+  .hi { color: #fff; }
+  .accent-text { color: #e8401c; }
+
+  /* pill button */
+  .btn-wf {
+    display: inline-block;
+    border: 1px solid #fff;
+    padding: 7px 18px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #fff;
+    cursor: pointer;
+  }
+  .btn-wf.fill { background: #fff; color: #000; }
+  .btn-wf.sm { padding: 4px 10px; font-size: 9px; }
+  .btn-wf.danger { border-color: #e8401c; color: #e8401c; }
+
+  /* team color dots */
+  .tcolor {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+    flex-shrink: 0;
+  }
+
+  /* progress bar */
+  .bar-track {
+    height: 4px;
+    background: #222;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    background: #fff;
+    position: absolute;
+    left: 0; top: 0;
+  }
+  .bar-fill.accent { background: #e8401c; }
+
+  /* grid helpers */
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .g4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; }
+  .g-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  .g-3-1 { display: grid; grid-template-columns: 3fr 1fr; gap: 16px; }
+  .g-1-3 { display: grid; grid-template-columns: 1fr 3fr; gap: 16px; }
+  .flex { display: flex; }
+  .flex-col { display: flex; flex-direction: column; }
+  .gap4 { gap: 4px; }
+  .gap8 { gap: 8px; }
+  .gap12 { gap: 12px; }
+  .gap16 { gap: 16px; }
+  .gap24 { gap: 24px; }
+  .mb4 { margin-bottom: 4px; }
+  .mb8 { margin-bottom: 8px; }
+  .mb12 { margin-bottom: 12px; }
+  .mb16 { margin-bottom: 16px; }
+  .mb24 { margin-bottom: 24px; }
+  .jc-between { justify-content: space-between; }
+  .ai-center { align-items: center; }
+  .ai-end { align-items: flex-end; }
+
+  /* violin placeholder */
+  .violin-ph {
+    width: 100%;
+    height: 48px;
+    position: relative;
+  }
+  .violin-ph svg { width: 100%; height: 100%; }
+
+  /* rank badge */
+  .rank {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: #555;
+    width: 28px;
+    flex-shrink: 0;
+  }
+  .rank.top { color: #e8401c; }
+
+  /* percentile bar */
+  .pct-bar {
+    height: 2px;
+    background: #2a2a2a;
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .pct-range {
+    position: absolute;
+    height: 2px;
+    background: #555;
+  }
+  .pct-median {
+    position: absolute;
+    width: 2px;
+    height: 8px;
+    background: #fff;
+    top: -3px;
+  }
+
+  /* flag badge */
+  .flag {
+    font-size: 8px;
+    padding: 2px 6px;
+    border: 1px solid #e8401c;
+    color: #e8401c;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .flag.ok {
+    border-color: #444;
+    color: #555;
+  }
+
+  /* divider */
+  hr.wf { border: none; border-top: 1px solid #1e1e1e; margin: 16px 0; }
+
+  /* ── VARIATION DESCRIPTION ── */
+  .var-desc {
+    display: flex;
+    gap: 32px;
+    padding: 20px 32px;
+    border-bottom: 1px solid #1a1a1a;
+    background: #0d0d0d;
+  }
+  .var-desc h2 {
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .var-desc p {
+    font-size: 10px;
+    color: #555;
+    line-height: 1.6;
+    max-width: 420px;
+  }
+
+  /* inline status dots */
+  .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; }
+  .dot.ok { background: #3a3a3a; }
+  .dot.warn { background: #e8401c; }
+  .dot.act { background: #fff; }
+
+  /* step indicator */
+  .step-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 28px;
+  }
+  .step-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #444;
+  }
+  .step-item.active { color: #fff; }
+  .step-item.done { color: #555; }
+  .step-num {
+    width: 20px; height: 20px;
+    border: 1px solid #333;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+  .step-item.active .step-num { border-color: #fff; color: #fff; }
+  .step-item.done .step-num { border-color: #444; background: #1a1a1a; }
+  .step-line {
+    width: 40px;
+    height: 1px;
+    background: #2a2a2a;
+    margin: 0 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── META NAVIGATION ─── -->
+<div class="meta-nav">
+  <div class="logo">RHTER <span>F1 FANTASY</span> — WIREFRAMES</div>
+  <div class="screen-tabs" id="screenTabs">
+    <button class="stab active" onclick="setScreen(0)">01 UPLOAD</button>
+    <button class="stab" onclick="setScreen(1)">02 REVIEW</button>
+    <button class="stab" onclick="setScreen(2)">03 ANALYSIS</button>
+  </div>
+  <div class="variation-tabs">
+    <button class="vtab active" onclick="setVar('a')">A — COCKPIT</button>
+    <button class="vtab" onclick="setVar('b')">B — PIPELINE</button>
+    <button class="vtab" onclick="setVar('c')">C — TERMINAL</button>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     VARIATION A — COCKPIT HUD
+══════════════════════════════════════════════════ -->
+<div class="variation active" id="var-a">
+  <div class="var-desc">
+    <div>
+      <h2>A — Cockpit HUD</h2>
+      <p>Persistent top status bar shows race context + live budget at all times. Left rail for step navigation. Main content area is instrument-panel style: data in bordered cells, all-caps labels, large key numbers. Team colors used sparingly for constructors.</p>
+    </div>
+  </div>
+
+  <!-- A / SCREEN 1: UPLOAD -->
+  <div class="screen active" id="a-s0">
+  <div class="wf-canvas">
+    <!-- App chrome -->
+    <div class="box mb16" style="padding: 10px 20px;">
+      <div class="flex ai-center jc-between">
+        <div class="flex gap24 ai-center">
+          <span style="font-size:10px; letter-spacing:.2em; color:#fff;">RHTER</span>
+          <span style="font-size:9px; color:#444; letter-spacing:.15em;">2026 RW1 — BAHRAIN</span>
+        </div>
+        <div class="flex gap16 ai-center">
+          <span class="wf-sm">BUDGET <span class="hi">—</span></span>
+          <span class="wf-sm">TEAMS <span class="hi">—</span></span>
+          <span style="font-size:8px; color:#333;">SYS OK</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="g-1-3 gap16" style="min-height: 560px;">
+      <!-- Left rail -->
+      <div class="flex-col gap8">
+        <div class="box" style="padding:12px;">
+          <div class="box-label">PHASE</div>
+          <div class="flex-col gap4" style="margin-top:8px;">
+            <div class="btn-wf fill" style="text-align:center; font-size:9px;">01 UPLOAD</div>
+            <div class="btn-wf" style="text-align:center; font-size:9px; border-color:#222; color:#333;">02 REVIEW</div>
+            <div class="btn-wf" style="text-align:center; font-size:9px; border-color:#222; color:#333;">03 ANALYSIS</div>
+          </div>
+        </div>
+        <div class="box" style="padding:12px; flex:1;">
+          <div class="box-label">SESSION</div>
+          <div class="flex-col gap8" style="margin-top:8px;">
+            <div>
+              <div class="wf-h">RACE</div>
+              <div style="font-size:11px; color:#666;">— —</div>
+            </div>
+            <div>
+              <div class="wf-h">SEASON</div>
+              <div style="font-size:11px; color:#666;">2026</div>
+            </div>
+            <div>
+              <div class="wf-h">ROUND</div>
+              <div style="font-size:11px; color:#666;">— —</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main -->
+      <div class="flex-col gap16">
+        <div class="box dashed" style="flex:1; min-height:400px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; border-color:#2a2a2a;">
+          <div class="box-label accent">UPLOAD ZONE</div>
+          <!-- Drop icon placeholder -->
+          <div style="width:64px; height:64px; border:1px dashed #333; display:flex; align-items:center; justify-content:center;">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <line x1="14" y1="4" x2="14" y2="20" stroke="#444" stroke-width="1.5"/>
+              <polyline points="8,10 14,4 20,10" fill="none" stroke="#444" stroke-width="1.5"/>
+              <line x1="4" y1="24" x2="24" y2="24" stroke="#444" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div style="text-align:center;">
+            <div class="wf-h mb4">DROP RHTER WEBP FILE HERE</div>
+            <div class="wf-sm">or click to browse</div>
+            <div class="wf-sm" style="margin-top:4px;">accepted: .webp</div>
+          </div>
+          <div class="btn-wf fill">SELECT FILE</div>
+        </div>
+
+        <div class="g3 gap16">
+          <div class="box" style="padding:12px;">
+            <div class="wf-h mb4">EXTRACT MODE</div>
+            <div style="font-size:10px; color:#666;">Auto — Full parse</div>
+          </div>
+          <div class="box" style="padding:12px;">
+            <div class="wf-h mb4">LAST SESSION</div>
+            <div style="font-size:10px; color:#666;">2026 RW1 — 247 teams</div>
+          </div>
+          <div class="box" style="padding:12px;">
+            <div class="wf-h mb4">STATUS</div>
+            <div style="font-size:10px; color:#555;">AWAITING INPUT</div>
+          </div>
+        </div>
+
+        <div class="wf-note">↑ After file drop, a progress animation plays and the system extracts all team rows automatically. Then advances to REVIEW.</div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- A / SCREEN 2: REVIEW -->
+  <div class="screen" id="a-s1">
+  <div class="wf-canvas">
+    <div class="box mb16" style="padding: 10px 20px;">
+      <div class="flex ai-center jc-between">
+        <div class="flex gap24 ai-center">
+          <span style="font-size:10px; letter-spacing:.2em; color:#fff;">RHTER</span>
+          <span style="font-size:9px; color:#444; letter-spacing:.15em;">2026 RW1 — BAHRAIN</span>
+        </div>
+        <div class="flex gap16 ai-center">
+          <span class="wf-sm">BUDGET <span class="hi">104.9 ml</span></span>
+          <span class="wf-sm">TEAMS <span class="hi">312</span></span>
+          <span class="wf-sm accent-text">⚑ 7 FLAGGED</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="g-1-3 gap16">
+      <!-- Left rail -->
+      <div class="flex-col gap8">
+        <div class="box" style="padding:12px;">
+          <div class="box-label">PHASE</div>
+          <div class="flex-col gap4" style="margin-top:8px;">
+            <div class="btn-wf" style="text-align:center; font-size:9px; border-color:#222; color:#333;">01 UPLOAD</div>
+            <div class="btn-wf fill" style="text-align:center; font-size:9px;">02 REVIEW</div>
+            <div class="btn-wf" style="text-align:center; font-size:9px; border-color:#222; color:#333;">03 ANALYSIS</div>
+          </div>
+        </div>
+        <!-- BUDGET CONTROL — key UI element -->
+        <div class="box accent" style="padding:12px;">
+          <div class="box-label accent">BUDGET LIMIT</div>
+          <div class="wf-big" style="font-size:28px; margin: 12px 0 4px;">104.9</div>
+          <div class="wf-sm mb8">ml — max spend</div>
+          <div class="bar-track mb4">
+            <div class="bar-fill" style="width: 72%;"></div>
+          </div>
+          <div class="flex jc-between">
+            <span class="wf-sm">MIN 95.0</span>
+            <span class="wf-sm">MAX 115.0</span>
+          </div>
+          <div class="wf-note" style="margin-top:8px;">Teams over this limit hidden in Analysis</div>
+        </div>
+        <div class="box" style="padding:12px;">
+          <div class="wf-h mb8">FILTERS</div>
+          <div class="flex-col gap8">
+            <div style="font-size:9px; color:#555;">
+              <span class="dot warn"></span>SHOW FLAGGED ONLY
+            </div>
+            <div style="font-size:9px; color:#888;">
+              <span class="dot act"></span>SHOW ALL ROWS
+            </div>
+          </div>
+        </div>
+        <div class="box" style="padding:12px; flex:1;">
+          <div class="wf-h mb8">EXTRACTION SUMMARY</div>
+          <div class="flex-col gap6" style="gap:6px;">
+            <div class="flex jc-between">
+              <span class="wf-sm">Teams parsed</span>
+              <span style="font-size:10px;">312</span>
+            </div>
+            <div class="flex jc-between">
+              <span class="wf-sm">Flagged</span>
+              <span style="font-size:10px; color:#e8401c;">7</span>
+            </div>
+            <div class="flex jc-between">
+              <span class="wf-sm">Confidence</span>
+              <span style="font-size:10px;">98.2%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main panel -->
+      <div class="flex-col gap12">
+        <!-- Column headers -->
+        <div class="box" style="padding: 8px 16px;">
+          <div style="display:grid; grid-template-columns: 32px 80px 1fr 100px 100px 100px 80px 60px; gap:8px; align-items:center; font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:#444;">
+            <span>#</span>
+            <span>BUDGET</span>
+            <span>DRIVERS + CONSTRUCTORS</span>
+            <span>P50 xPTS</span>
+            <span>P75</span>
+            <span>P95</span>
+            <span>KELLY</span>
+            <span>STATUS</span>
+          </div>
+        </div>
+
+        <!-- Row — FLAGGED -->
+        <div class="box accent" style="padding: 10px 16px;">
+          <div style="display:grid; grid-template-columns: 32px 80px 1fr 100px 100px 100px 80px 60px; gap:8px; align-items:center;">
+            <span style="font-size:10px; color:#e8401c;">47</span>
+            <span style="font-size:11px;">102.5</span>
+            <div class="flex ai-center gap8">
+              <span class="tcolor" style="background:#06d3bf;"></span>
+              <span class="tcolor" style="background:#dd1818;"></span>
+              <span style="font-size:9px; color:#888;">LEC(2X) LAW OCO BEA BOT</span>
+            </div>
+            <span style="font-size:11px;">176</span>
+            <span style="font-size:11px;">259</span>
+            <span style="font-size:11px;">287</span>
+            <span style="font-size:11px;">0.68</span>
+            <span class="flag">FLAG</span>
+          </div>
+          <div class="wf-sm" style="margin-top:8px; padding-top:8px; border-top:1px dashed #2a2a2a; color:#e8401c;">
+            ⚑ P95 value appears high — verify against source. <span style="color:#888; cursor:pointer;">[ EDIT ] [ CONFIRM ]</span>
+          </div>
+        </div>
+
+        <!-- Row — OK -->
+        <div class="box" style="padding: 10px 16px;">
+          <div style="display:grid; grid-template-columns: 32px 80px 1fr 100px 100px 100px 80px 60px; gap:8px; align-items:center;">
+            <span style="font-size:10px; color:#555;">48</span>
+            <span style="font-size:11px;">104.1</span>
+            <div class="flex ai-center gap8">
+              <span class="tcolor" style="background:#06d3bf;"></span>
+              <span class="tcolor" style="background:#ff4500;"></span>
+              <span style="font-size:9px; color:#888;">RUS(2X) NOR PIA HAM BOT</span>
+            </div>
+            <span style="font-size:11px;">177</span>
+            <span style="font-size:11px;">261</span>
+            <span style="font-size:11px;">290</span>
+            <span style="font-size:11px;">0.71</span>
+            <span class="flag ok">OK</span>
+          </div>
+        </div>
+
+        <!-- Row — OK -->
+        <div class="box" style="padding: 10px 16px;">
+          <div style="display:grid; grid-template-columns: 32px 80px 1fr 100px 100px 100px 80px 60px; gap:8px; align-items:center;">
+            <span style="font-size:10px; color:#555;">49</span>
+            <span style="font-size:11px;">99.8</span>
+            <div class="flex ai-center gap8">
+              <span class="tcolor" style="background:#ff4500;"></span>
+              <span class="tcolor" style="background:#1e41ff;"></span>
+              <span style="font-size:9px; color:#888;">NOR(2X) VER PIA LEC BOT</span>
+            </div>
+            <span style="font-size:11px;">175</span>
+            <span style="font-size:11px;">258</span>
+            <span style="font-size:11px;">284</span>
+            <span style="font-size:11px;">0.65</span>
+            <span class="flag ok">OK</span>
+          </div>
+        </div>
+
+        <!-- More rows placeholder -->
+        <div class="ph" style="height:100px;">... 309 more rows ...</div>
+
+        <!-- Approve bar -->
+        <div class="box" style="padding:12px 16px; background:#111;">
+          <div class="flex jc-between ai-center">
+            <div class="flex gap16 ai-center">
+              <span class="wf-sm"><span class="accent-text">7 flagged</span> require attention</span>
+              <span class="wf-sm">305 auto-confirmed</span>
+            </div>
+            <div class="flex gap8">
+              <div class="btn-wf sm">RESOLVE ALL FLAGS</div>
+              <div class="btn-wf sm fill">APPROVE + CONTINUE →</div>
+            </div>
+          </div>
+        </div>
+        <div class="wf-note">↑ APPROVE locks data + advances to Analysis. Budget limit filters out teams silently before Analysis loads.</div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- A / SCREEN 3: ANALYSIS -->
+  <div class="screen" id="a-s2">
+  <div class="wf-canvas">
+    <div class="box mb16" style="padding: 10px 20px;">
+      <div class="flex ai-center jc-between">
+        <div class="flex gap24 ai-center">
+          <span style="font-size:10px; letter-spacing:.2em; color:#fff;">RHTER</span>
+          <span style="font-size:9px; color:#444; letter-spacing:.15em;">2026 RW1 — BAHRAIN</span>
+        </div>
+        <div class="flex gap16 ai-center">
+          <span class="wf-sm">BUDGET <span class="hi">≤ 104.9 ml</span></span>
+          <span class="wf-sm">ELIGIBLE TEAMS <span class="hi">247</span></span>
+          <span class="wf-sm">MODEL <span class="hi">KELLY</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="g-1-3 gap16">
+      <!-- Left rail -->
+      <div class="flex-col gap8">
+        <div class="box" style="padding:12px;">
+          <div class="box-label">PHASE</div>
+          <div class="flex-col gap4" style="margin-top:8px;">
+            <div class="btn-wf" style="text-align:center; font-size:9px; border-color:#222; color:#333;">01 UPLOAD</div>
+            <div class="btn-wf" style="text-align:center; font-size:9px; border-color:#222; color:#333;">02 REVIEW</div>
+            <div class="btn-wf fill" style="text-align:center; font-size:9px;">03 ANALYSIS</div>
+          </div>
+        </div>
+        <div class="box" style="padding:12px;">
+          <div class="box-label">MODEL</div>
+          <div class="flex-col gap4" style="margin-top:8px;">
+            <div class="btn-wf fill" style="text-align:center; font-size:9px;">KELLY CRITERION</div>
+            <div class="btn-wf" style="text-align:center; font-size:9px; border-color:#222; color:#333; opacity:.4;">EV MODEL</div>
+            <div class="btn-wf" style="text-align:center; font-size:9px; border-color:#222; color:#333; opacity:.4;">MONTE CARLO</div>
+          </div>
+        </div>
+        <div class="box" style="padding:12px;">
+          <div class="wf-h mb8">SORT BY</div>
+          <div class="flex-col gap4" style="font-size:9px;">
+            <div style="color:#e8401c; letter-spacing:.1em;">▶ KELLY SCORE</div>
+            <div style="color:#444; letter-spacing:.1em;">  P50 xPTS</div>
+            <div style="color:#444; letter-spacing:.1em;">  P95 CEILING</div>
+            <div style="color:#444; letter-spacing:.1em;">  BUDGET</div>
+          </div>
+        </div>
+        <div class="box" style="padding:12px;">
+          <div class="wf-h mb8">STATS SUMMARY</div>
+          <div class="flex-col gap6" style="gap:6px;">
+            <div class="flex jc-between">
+              <span class="wf-sm">Top kelly</span>
+              <span style="font-size:10px;">0.74</span>
+            </div>
+            <div class="flex jc-between">
+              <span class="wf-sm">Avg P50</span>
+              <span style="font-size:10px;">174.2</span>
+            </div>
+            <div class="flex jc-between">
+              <span class="wf-sm">Best ceiling</span>
+              <span style="font-size:10px;">312 pts</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main -->
+      <div class="flex-col gap8">
+        <!-- Top team — highlighted -->
+        <div class="box accent" style="padding:14px 16px;">
+          <div class="box-label accent">#1 — TOP PICK</div>
+          <div style="display:grid; grid-template-columns:40px 1fr 120px 120px 60px; gap:12px; align-items:center;">
+            <div style="text-align:center;">
+              <div style="font-size:20px; font-weight:700; color:#e8401c;">1</div>
+            </div>
+            <div>
+              <div class="flex ai-center gap8 mb4">
+                <span class="tcolor" style="background:#06d3bf;"></span>
+                <span class="tcolor" style="background:#dd1818;"></span>
+                <span style="font-size:9px; color:#aaa; letter-spacing:.1em;">LEC(2X) · LAW · OCO · BEA · BOT</span>
+              </div>
+              <div class="violin-ph mb4">
+                <svg viewBox="0 0 200 40" preserveAspectRatio="none">
+                  <!-- simplified violin shape -->
+                  <path d="M20,20 Q60,5 100,20 Q140,35 180,20" fill="none" stroke="#555" stroke-width="1"/>
+                  <line x1="100" y1="8" x2="100" y2="32" stroke="#fff" stroke-width="1.5"/>
+                  <!-- p25-p75 box -->
+                  <rect x="80" y="14" width="40" height="12" fill="none" stroke="#444" stroke-width="1"/>
+                </svg>
+              </div>
+              <div style="font-size:9px; color:#444;">BUDGET 102.5 ml · MER + FER</div>
+            </div>
+            <div>
+              <div class="wf-h mb4">P50 / P75 / P95</div>
+              <div style="font-size:13px; font-weight:700;">176 <span style="font-size:10px; color:#555;">/ 259 / 287</span></div>
+            </div>
+            <div>
+              <div class="wf-h mb4">KELLY SCORE</div>
+              <div style="font-size:18px; font-weight:700;">0.74</div>
+            </div>
+            <div class="btn-wf fill sm" style="text-align:center;">PICK</div>
+          </div>
+        </div>
+
+        <!-- Rows 2-5 -->
+        {['#2','#3','#4','#5'].map((r,i) => `
+        <div class="box" style="padding:10px 16px;">
+          <div style="display:grid; grid-template-columns:40px 1fr 120px 120px 60px; gap:12px; align-items:center;">
+            <div style="font-size:12px; color:#555; text-align:center;">${i+2}</div>
+            <div>
+              <div class="flex ai-center gap8 mb4">
+                <span class="tcolor" style="background:#888;"></span>
+                <span class="tcolor" style="background:#555;"></span>
+                <span style="font-size:9px; color:#555; letter-spacing:.1em;">TEAM ${i+2} DRIVERS</span>
+              </div>
+              <div class="violin-ph">
+                <svg viewBox="0 0 200 30" preserveAspectRatio="none">
+                  <path d="M20,15 Q60,4 100,15 Q140,26 180,15" fill="none" stroke="#333" stroke-width="1"/>
+                  <line x1="98" y1="5" x2="98" y2="25" stroke="#666" stroke-width="1"/>
+                </svg>
+              </div>
+            </div>
+            <div style="font-size:12px; color:#888;">17${i+1} <span style="font-size:10px; color:#444;">/ 25${i+6} / 28${i+1}</span></div>
+            <div style="font-size:14px; color:#888;">0.${71-i*2}</div>
+            <div class="btn-wf sm" style="text-align:center;">PICK</div>
+          </div>
+        </div>
+        `).join('')}
+
+        <div class="ph" style="height:60px;">... 242 more ranked teams ...</div>
+        <div class="wf-note">↑ Teams ranked by Kelly score. PICK locks in your choice. Violin shape = point distribution. White line = median.</div>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     VARIATION B — PIPELINE (WIZARD FLOW)
+══════════════════════════════════════════════════ -->
+<div class="variation" id="var-b">
+  <div class="var-desc">
+    <div>
+      <h2>B — Pipeline</h2>
+      <p>Linear 3-step wizard. Progress bar at top always shows where you are in the pipeline. Each stage gets the full canvas. Clean, breathing room. Budget is a prominent card at the entry to Review stage. Much easier to explain to someone new.</p>
+    </div>
+  </div>
+
+  <!-- B / SCREEN 1: UPLOAD -->
+  <div class="screen active" id="b-s0">
+  <div class="wf-canvas" style="max-width:960px;">
+    <!-- Step bar -->
+    <div class="step-bar">
+      <div class="step-item active">
+        <div class="step-num">1</div>
+        <span>UPLOAD</span>
+      </div>
+      <div class="step-line"></div>
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <span>REVIEW</span>
+      </div>
+      <div class="step-line"></div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <span>ANALYSIS</span>
+      </div>
+    </div>
+
+    <div class="box dashed" style="min-height:400px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:32px; border-color:#2a2a2a; margin-bottom:24px;">
+      <div>
+        <div class="wf-h" style="text-align:center; font-size:11px; margin-bottom:4px;">STEP 1 OF 3</div>
+        <div style="font-size:22px; text-align:center; font-weight:700; letter-spacing:-0.01em;">LOAD RHTER DATA</div>
+      </div>
+      <div style="width:80px; height:80px; border:1px dashed #333; display:flex; align-items:center; justify-content:center;">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+          <line x1="18" y1="4" x2="18" y2="26" stroke="#444" stroke-width="2"/>
+          <polyline points="10,12 18,4 26,12" fill="none" stroke="#444" stroke-width="2"/>
+          <line x1="4" y1="32" x2="32" y2="32" stroke="#444" stroke-width="2"/>
+        </svg>
+      </div>
+      <div style="text-align:center;">
+        <div class="wf-h mb4">DROP WEBP FILE HERE</div>
+        <div class="wf-sm">Rhter violin chart screenshot</div>
+      </div>
+      <div class="btn-wf fill">SELECT FILE</div>
+    </div>
+
+    <div class="g3 gap16">
+      <div class="box" style="padding:16px;">
+        <div class="wf-h mb8">WHAT HAPPENS NEXT</div>
+        <div class="flex-col gap4" style="font-size:9px; color:#555; line-height:1.8;">
+          <div>→ File uploads</div>
+          <div>→ AI extracts all team rows</div>
+          <div>→ Data is auto-validated</div>
+          <div>→ Flags suspect values</div>
+        </div>
+      </div>
+      <div class="box" style="padding:16px;">
+        <div class="wf-h mb8">EXTRACTION TIME</div>
+        <div style="font-size:20px; font-weight:700;">~8s</div>
+        <div class="wf-sm">for typical 300-team dataset</div>
+      </div>
+      <div class="box" style="padding:16px;">
+        <div class="wf-h mb8">LAST SESSION</div>
+        <div style="font-size:10px; color:#666;">2026 RW1 · 247 teams</div>
+        <div class="wf-sm">3 days ago</div>
+        <div class="btn-wf sm" style="margin-top:8px;">RELOAD</div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- B / SCREEN 2: REVIEW -->
+  <div class="screen" id="b-s1">
+  <div class="wf-canvas" style="max-width:960px;">
+    <div class="step-bar">
+      <div class="step-item done">
+        <div class="step-num">✓</div>
+        <span>UPLOAD</span>
+      </div>
+      <div class="step-line"></div>
+      <div class="step-item active">
+        <div class="step-num">2</div>
+        <span>REVIEW</span>
+      </div>
+      <div class="step-line"></div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <span>ANALYSIS</span>
+      </div>
+    </div>
+
+    <!-- Budget setter — PROMINENT -->
+    <div class="box accent mb24" style="padding:20px 24px;">
+      <div class="box-label accent">SET BUDGET LIMIT BEFORE CONTINUING</div>
+      <div class="g3 gap24" style="margin-top:8px; align-items:center;">
+        <div>
+          <div class="wf-h mb4">YOUR BUDGET</div>
+          <div style="font-size:36px; font-weight:700; letter-spacing:-0.02em;">104.9 <span style="font-size:14px; color:#888;">ml</span></div>
+          <div class="bar-track" style="margin-top:8px;">
+            <div class="bar-fill accent" style="width:68%;"></div>
+          </div>
+          <div class="flex jc-between" style="margin-top:4px;">
+            <span class="wf-sm">90</span><span class="wf-sm">115</span>
+          </div>
+        </div>
+        <div>
+          <div class="wf-h mb8">TEAMS IN BUDGET</div>
+          <div style="font-size:28px; font-weight:700;">247 <span style="font-size:12px; color:#555;">/ 312</span></div>
+          <div class="wf-sm">65 teams hidden above limit</div>
+        </div>
+        <div class="flex-col gap8 ai-end" style="justify-content:flex-end;">
+          <div class="btn-wf sm">ADJUST</div>
+          <div class="wf-note">Teams over limit will not appear in Analysis</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Review table -->
+    <div class="box mb8" style="padding:10px 16px; background:#0d0d0d;">
+      <div class="flex jc-between ai-center">
+        <div class="flex gap16 ai-center">
+          <span class="wf-sm"><span class="accent-text">7 flagged</span> need review</span>
+          <div class="btn-wf sm">FLAGGED ONLY</div>
+          <div class="btn-wf sm fill">ALL ROWS</div>
+        </div>
+        <div class="wf-sm">305 auto-confirmed</div>
+      </div>
+    </div>
+
+    <div class="box mb8" style="padding:8px 16px; background:#0a0a0a;">
+      <div style="display:grid; grid-template-columns:40px 90px 1fr 80px 80px 80px 70px 80px; gap:8px; font-size:8px; letter-spacing:.15em; text-transform:uppercase; color:#333;">
+        <span>ROW</span><span>BUDGET</span><span>LINEUP</span><span>P50</span><span>P75</span><span>P95</span><span>KELLY</span><span>STATUS</span>
+      </div>
+    </div>
+
+    <!-- Flagged row -->
+    <div class="box accent mb4" style="padding:12px 16px;">
+      <div style="display:grid; grid-template-columns:40px 90px 1fr 80px 80px 80px 70px 80px; gap:8px; align-items:center;">
+        <span style="font-size:9px; color:#e8401c;">47</span>
+        <span style="font-size:11px;">102.5</span>
+        <div class="flex ai-center gap6">
+          <span class="tcolor" style="background:#06d3bf;"></span><span class="tcolor" style="background:#dd1818;"></span>
+          <span style="font-size:9px; color:#888;">LEC(2X) LAW OCO BEA BOT</span>
+        </div>
+        <span style="font-size:11px;">176</span>
+        <span style="font-size:11px;">259</span>
+        <span style="font-size:11px; color:#e8401c;">287 ⚑</span>
+        <span style="font-size:11px;">0.68</span>
+        <div class="flex gap4">
+          <div class="btn-wf sm danger">EDIT</div>
+          <div class="btn-wf sm">OK</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box mb4" style="padding:12px 16px; opacity:0.7;">
+      <div style="display:grid; grid-template-columns:40px 90px 1fr 80px 80px 80px 70px 80px; gap:8px; align-items:center;">
+        <span style="font-size:9px; color:#555;">48</span>
+        <span style="font-size:11px;">104.1</span>
+        <div class="flex ai-center gap6">
+          <span class="tcolor" style="background:#888;"></span><span class="tcolor" style="background:#555;"></span>
+          <span style="font-size:9px; color:#555;">RUS(2X) NOR PIA HAM BOT</span>
+        </div>
+        <span style="font-size:11px; color:#555;">177</span>
+        <span style="font-size:11px; color:#555;">261</span>
+        <span style="font-size:11px; color:#555;">290</span>
+        <span style="font-size:11px; color:#555;">0.71</span>
+        <span class="flag ok">OK</span>
+      </div>
+    </div>
+
+    <div class="ph mb16" style="height:80px;">... more rows ...</div>
+
+    <div class="flex jc-between ai-center">
+      <div class="btn-wf">← BACK</div>
+      <div class="flex gap8 ai-center">
+        <span class="wf-sm">Resolve 7 flags to continue</span>
+        <div class="btn-wf fill">APPROVE DATA + CONTINUE →</div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- B / SCREEN 3: ANALYSIS -->
+  <div class="screen" id="b-s2">
+  <div class="wf-canvas" style="max-width:960px;">
+    <div class="step-bar">
+      <div class="step-item done"><div class="step-num">✓</div><span>UPLOAD</span></div>
+      <div class="step-line"></div>
+      <div class="step-item done"><div class="step-num">✓</div><span>REVIEW</span></div>
+      <div class="step-line"></div>
+      <div class="step-item active"><div class="step-num">3</div><span>ANALYSIS</span></div>
+    </div>
+
+    <!-- Controls bar -->
+    <div class="box mb16" style="padding:12px 16px;">
+      <div class="flex jc-between ai-center">
+        <div class="flex gap16 ai-center">
+          <span class="wf-sm">MODEL</span>
+          <div class="btn-wf sm fill">KELLY CRITERION</div>
+          <div class="btn-wf sm" style="opacity:.4;">EV</div>
+          <div class="btn-wf sm" style="opacity:.4;">MONTE CARLO</div>
+        </div>
+        <div class="flex gap12 ai-center">
+          <span class="wf-sm">SORT</span>
+          <div class="btn-wf sm fill">KELLY ↓</div>
+          <span class="wf-sm">247 ELIGIBLE</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top pick -->
+    <div class="box accent mb8" style="padding:16px 20px;">
+      <div class="box-label accent">#1 KELLY SCORE — RECOMMENDED PICK</div>
+      <div style="display:grid; grid-template-columns:1fr 140px 100px 80px; gap:20px; align-items:center; margin-top:8px;">
+        <div>
+          <div class="flex ai-center gap8 mb8">
+            <span class="tcolor" style="background:#06d3bf; width:10px; height:10px;"></span>
+            <span style="font-size:9px; color:#aaa; letter-spacing:.1em;">MER + FER</span>
+            <span class="tcolor" style="background:#dd1818; width:10px; height:10px;"></span>
+          </div>
+          <div style="font-size:11px; color:#888; letter-spacing:.08em; margin-bottom:12px;">LEC(2X) · LAW · OCO · BEA · BOT — 102.5 ml</div>
+          <!-- Distribution bar -->
+          <div style="position:relative; height:6px; background:#1a1a1a; margin-bottom:4px;">
+            <div style="position:absolute; left:20%; width:60%; height:100%; background:#333;"></div>
+            <div style="position:absolute; left:50%; width:2px; height:12px; top:-3px; background:#fff;"></div>
+          </div>
+          <div class="flex jc-between">
+            <span style="font-size:8px; color:#333;">P5: 91</span>
+            <span style="font-size:8px; color:#444;">P25: 147</span>
+            <span style="font-size:8px; color:#fff;">P50: 176</span>
+            <span style="font-size:8px; color:#444;">P75: 259</span>
+            <span style="font-size:8px; color:#333;">P95: 287</span>
+          </div>
+        </div>
+        <div>
+          <div class="wf-h mb4">EXPECTED PTS</div>
+          <div style="font-size:22px; font-weight:700;">176.4</div>
+          <div class="wf-sm">P50 median</div>
+        </div>
+        <div>
+          <div class="wf-h mb4">KELLY</div>
+          <div style="font-size:28px; font-weight:700; color:#e8401c;">0.74</div>
+        </div>
+        <div class="btn-wf fill" style="text-align:center; padding:14px;">PICK THIS TEAM</div>
+      </div>
+    </div>
+
+    <!-- Rest of list -->
+    <div class="flex-col gap6">
+      <div class="box" style="padding:10px 20px; opacity:0.8;">
+        <div style="display:grid; grid-template-columns:28px 1fr 140px 100px 80px; gap:20px; align-items:center;">
+          <span style="font-size:11px; color:#555;">#2</span>
+          <div>
+            <div class="flex ai-center gap6 mb4"><span class="tcolor" style="background:#888;"></span><span class="tcolor" style="background:#555;"></span><span style="font-size:9px; color:#666;">RUS(2X) NOR PIA HAM BOT — 104.1 ml</span></div>
+            <div style="position:relative; height:4px; background:#1a1a1a;"><div style="position:absolute; left:22%; width:56%; height:100%; background:#2a2a2a;"></div><div style="position:absolute; left:51%; width:2px; height:8px; top:-2px; background:#888;"></div></div>
+          </div>
+          <div style="font-size:14px; color:#888;">177.0</div>
+          <div style="font-size:16px; color:#888;">0.71</div>
+          <div class="btn-wf sm" style="text-align:center;">PICK</div>
+        </div>
+      </div>
+      <div class="box" style="padding:10px 20px; opacity:0.6;">
+        <div style="display:grid; grid-template-columns:28px 1fr 140px 100px 80px; gap:20px; align-items:center;">
+          <span style="font-size:11px; color:#555;">#3</span>
+          <div>
+            <div class="flex ai-center gap6 mb4"><span class="tcolor" style="background:#666;"></span><span class="tcolor" style="background:#444;"></span><span style="font-size:9px; color:#666;">NOR(2X) VER PIA LEC BOT — 99.8 ml</span></div>
+            <div style="position:relative; height:4px; background:#1a1a1a;"><div style="position:absolute; left:18%; width:60%; height:100%; background:#222;"></div><div style="position:absolute; left:48%; width:2px; height:8px; top:-2px; background:#666;"></div></div>
+          </div>
+          <div style="font-size:14px; color:#555;">175.0</div>
+          <div style="font-size:16px; color:#555;">0.69</div>
+          <div class="btn-wf sm" style="text-align:center;">PICK</div>
+        </div>
+      </div>
+      <div class="ph" style="height:60px;">... 244 more ...</div>
+    </div>
+  </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     VARIATION C — TERMINAL GRID
+══════════════════════════════════════════════════ -->
+<div class="variation" id="var-c">
+  <div class="var-desc">
+    <div>
+      <h2>C — Terminal Grid</h2>
+      <p>Everything in a strict grid of bordered cells with dotted/dashed corners — inspired by the RD.OS + cybersecurity dashboard reference. Heavy use of uppercase labels with bracket notation [LIKE_THIS]. No rounded corners anywhere. The budget and model selector live in a persistent left column across all phases.</p>
+    </div>
+  </div>
+
+  <!-- C / SCREEN 1: UPLOAD -->
+  <div class="screen active" id="c-s0">
+  <div class="wf-canvas">
+    <!-- Top system bar -->
+    <div class="flex jc-between ai-center mb16" style="border-bottom:1px dashed #222; padding-bottom:12px;">
+      <div style="font-size:9px; letter-spacing:.2em; color:#555;">RHTER // F1 FANTASY TOOLS // V2.0</div>
+      <div style="font-size:9px; letter-spacing:.15em; color:#555;">2026 SEASON // RW1 // PHASE: [UPLOAD]</div>
+      <div style="font-size:9px; letter-spacing:.15em; color:#555;">SYS: OK // DATA: NONE</div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:220px 1fr; gap:0; border:1px solid #222;">
+      <!-- Left column -->
+      <div style="border-right:1px solid #222;">
+        <div style="padding:8px 12px; border-bottom:1px solid #222; font-size:8px; letter-spacing:.2em; color:#444;">[NAVIGATION]</div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222; background:#111;">
+          <div style="font-size:9px; color:#fff; letter-spacing:.12em;">01 [UPLOAD]</div>
+        </div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222;">
+          <div style="font-size:9px; color:#333; letter-spacing:.12em;">02 [REVIEW]</div>
+        </div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222;">
+          <div style="font-size:9px; color:#333; letter-spacing:.12em;">03 [ANALYSIS]</div>
+        </div>
+        <div style="padding:8px 12px; border-bottom:1px solid #222; font-size:8px; letter-spacing:.2em; color:#444; margin-top:4px;">[SESSION]</div>
+        <div style="padding:12px;">
+          <div style="font-size:8px; color:#444; letter-spacing:.15em; margin-bottom:4px;">RACE</div>
+          <div style="font-size:10px; color:#666;">— —</div>
+          <hr class="wf">
+          <div style="font-size:8px; color:#444; letter-spacing:.15em; margin-bottom:4px;">TEAMS LOADED</div>
+          <div style="font-size:10px; color:#666;">NONE</div>
+        </div>
+      </div>
+
+      <!-- Main grid -->
+      <div>
+        <div style="padding:8px 16px; border-bottom:1px solid #222; font-size:8px; letter-spacing:.2em; color:#444;">[UPLOAD] // DATA INGESTION</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; border-bottom:1px solid #222;">
+          <!-- Drop zone -->
+          <div style="border-right:1px solid #222; padding:40px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; min-height:300px; border:2px dashed #2a2a2a; margin:16px; background:#0a0a0a;">
+            <div style="font-size:8px; letter-spacing:.2em; color:#555;">[DROP ZONE]</div>
+            <div style="border:1px solid #333; width:48px; height:48px; display:flex; align-items:center; justify-content:center;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><line x1="12" y1="2" x2="12" y2="16" stroke="#555" stroke-width="1.5"/><polyline points="6,8 12,2 18,8" fill="none" stroke="#555" stroke-width="1.5"/><line x1="2" y1="20" x2="22" y2="20" stroke="#555" stroke-width="1.5"/></svg>
+            </div>
+            <div style="text-align:center; font-size:9px; color:#555; letter-spacing:.1em; line-height:2;">
+              DROP RHTER .WEBP<br>OR CLICK TO BROWSE
+            </div>
+            <div class="btn-wf sm">[SELECT FILE]</div>
+          </div>
+          <!-- Status -->
+          <div style="padding:16px;">
+            <div style="font-size:8px; letter-spacing:.2em; color:#444; margin-bottom:12px;">[EXTRACTION STATUS]</div>
+            <div style="font-size:9px; color:#333; line-height:2.2; letter-spacing:.08em;">
+              AWAITING INPUT . . .<br>
+              TEAMS FOUND: —<br>
+              FLAGGED: —<br>
+              CONFIDENCE: —<br>
+            </div>
+            <hr class="wf">
+            <div style="font-size:8px; letter-spacing:.2em; color:#444; margin-bottom:8px;">[LAST SESSION]</div>
+            <div style="font-size:9px; color:#555; letter-spacing:.08em; line-height:1.8;">
+              2026 RW1 · 247 TEAMS<br>
+              3 DAYS AGO
+            </div>
+            <div class="btn-wf sm" style="margin-top:12px;">[RELOAD LAST]</div>
+          </div>
+        </div>
+        <!-- Process info -->
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; border-top:1px solid #222;">
+          <div style="padding:12px 16px; border-right:1px solid #222;">
+            <div style="font-size:8px; letter-spacing:.2em; color:#444; margin-bottom:8px;">[STEP 1]</div>
+            <div style="font-size:9px; color:#555; line-height:1.8;">FILE UPLOAD + PARSE</div>
+          </div>
+          <div style="padding:12px 16px; border-right:1px solid #222;">
+            <div style="font-size:8px; letter-spacing:.2em; color:#444; margin-bottom:8px;">[STEP 2]</div>
+            <div style="font-size:9px; color:#555; line-height:1.8;">AI EXTRACTION ~8S</div>
+          </div>
+          <div style="padding:12px 16px;">
+            <div style="font-size:8px; letter-spacing:.2em; color:#444; margin-bottom:8px;">[STEP 3]</div>
+            <div style="font-size:9px; color:#555; line-height:1.8;">AUTO-VALIDATION</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- C / SCREEN 2: REVIEW -->
+  <div class="screen" id="c-s1">
+  <div class="wf-canvas">
+    <div class="flex jc-between ai-center mb16" style="border-bottom:1px dashed #222; padding-bottom:12px;">
+      <div style="font-size:9px; letter-spacing:.2em; color:#555;">RHTER // F1 FANTASY TOOLS // V2.0</div>
+      <div style="font-size:9px; letter-spacing:.15em; color:#555;">2026 // RW1 // [REVIEW] // 7 FLAGS</div>
+      <div style="font-size:9px; letter-spacing:.15em; color:#555;">BUDGET: [NOT SET]</div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:220px 1fr; gap:0; border:1px solid #222;">
+      <div style="border-right:1px solid #222;">
+        <div style="padding:8px 12px; border-bottom:1px solid #222; font-size:8px; letter-spacing:.2em; color:#444;">[NAVIGATION]</div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222;"><div style="font-size:9px; color:#333; letter-spacing:.12em;">01 [UPLOAD]</div></div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222; background:#111;"><div style="font-size:9px; color:#fff; letter-spacing:.12em;">02 [REVIEW]</div></div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222;"><div style="font-size:9px; color:#333; letter-spacing:.12em;">03 [ANALYSIS]</div></div>
+
+        <!-- Budget — in sidebar, always visible -->
+        <div style="border:1px solid #e8401c; margin:12px; padding:12px;">
+          <div style="font-size:8px; letter-spacing:.2em; color:#e8401c; margin-bottom:12px;">[BUDGET LIMIT]</div>
+          <div style="font-size:28px; font-weight:700; margin-bottom:4px;">104.9</div>
+          <div style="font-size:8px; color:#555; letter-spacing:.1em; margin-bottom:12px;">MILLION — MAX SPEND</div>
+          <div style="height:3px; background:#1a1a1a; margin-bottom:4px; position:relative;">
+            <div style="position:absolute; left:0; top:0; width:68%; height:100%; background:#e8401c; opacity:.6;"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="font-size:8px; color:#444;">90</span>
+            <span style="font-size:8px; color:#444;">115</span>
+          </div>
+          <div style="margin-top:12px; font-size:9px; color:#888;">247 / 312 IN BUDGET</div>
+          <div class="btn-wf sm" style="margin-top:8px; display:block; text-align:center;">[ADJUST]</div>
+        </div>
+
+        <div style="padding:12px; font-size:8px; color:#444; line-height:1.8; letter-spacing:.1em;">
+          EXTRACTED: 312<br>
+          FLAGGED: <span style="color:#e8401c;">7</span><br>
+          CONFIRMED: 305<br>
+          CONFIDENCE: 98.2%
+        </div>
+      </div>
+
+      <!-- Main -->
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 16px; border-bottom:1px solid #222;">
+          <div style="font-size:8px; letter-spacing:.2em; color:#444;">[DATA REVIEW] // 312 ROWS</div>
+          <div style="display:flex; gap:8px;">
+            <div class="btn-wf sm danger">[FLAGGED ONLY]</div>
+            <div class="btn-wf sm">[ALL ROWS]</div>
+          </div>
+        </div>
+        <!-- Column headers -->
+        <div style="display:grid; grid-template-columns:36px 80px 1fr 72px 72px 72px 64px 72px; gap:0; border-bottom:1px solid #222; padding:6px 16px; font-size:7px; letter-spacing:.18em; color:#333; text-transform:uppercase;">
+          <span>ROW</span><span>BUDGET</span><span>LINEUP</span><span>P50</span><span>P75</span><span>P95</span><span>KELLY</span><span>STATUS</span>
+        </div>
+
+        <!-- Flag row -->
+        <div style="display:grid; grid-template-columns:36px 80px 1fr 72px 72px 72px 64px 72px; gap:0; border-bottom:1px solid #e8401c; padding:10px 16px; border-left:2px solid #e8401c; align-items:center;">
+          <span style="font-size:9px; color:#e8401c;">047</span>
+          <span style="font-size:10px;">102.5</span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="tcolor" style="background:#06d3bf;"></span>
+            <span class="tcolor" style="background:#dd1818;"></span>
+            <span style="font-size:9px; color:#888; letter-spacing:.06em;">LEC(2X) LAW OCO BEA BOT</span>
+          </div>
+          <span style="font-size:10px;">176</span>
+          <span style="font-size:10px;">259</span>
+          <span style="font-size:10px; color:#e8401c;">287 ⚑</span>
+          <span style="font-size:10px;">0.68</span>
+          <div style="display:flex; gap:4px;">
+            <div class="btn-wf sm danger" style="font-size:7px; padding:3px 6px;">[EDIT]</div>
+            <div class="btn-wf sm" style="font-size:7px; padding:3px 6px;">[OK]</div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:36px 80px 1fr 72px 72px 72px 64px 72px; gap:0; border-bottom:1px solid #1a1a1a; padding:10px 16px; align-items:center; opacity:0.6;">
+          <span style="font-size:9px; color:#444;">048</span>
+          <span style="font-size:10px;">104.1</span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="tcolor" style="background:#888;"></span><span class="tcolor" style="background:#555;"></span>
+            <span style="font-size:9px; color:#555; letter-spacing:.06em;">RUS(2X) NOR PIA HAM BOT</span>
+          </div>
+          <span style="font-size:10px; color:#555;">177</span><span style="font-size:10px; color:#555;">261</span><span style="font-size:10px; color:#555;">290</span>
+          <span style="font-size:10px; color:#555;">0.71</span>
+          <span style="font-size:8px; color:#333; letter-spacing:.1em;">[OK]</span>
+        </div>
+
+        <div class="ph" style="height:120px; margin:0; border-radius:0;">... 310 MORE ROWS ...</div>
+
+        <!-- Bottom action -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-top:1px solid #222; background:#0a0a0a;">
+          <div class="btn-wf sm">[← BACK]</div>
+          <div style="display:flex; gap:12px; align-items:center;">
+            <span style="font-size:9px; color:#e8401c;">7 FLAGS UNRESOLVED</span>
+            <div class="btn-wf fill">[APPROVE + CONTINUE →]</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- C / SCREEN 3: ANALYSIS -->
+  <div class="screen" id="c-s2">
+  <div class="wf-canvas">
+    <div class="flex jc-between ai-center mb16" style="border-bottom:1px dashed #222; padding-bottom:12px;">
+      <div style="font-size:9px; letter-spacing:.2em; color:#555;">RHTER // F1 FANTASY TOOLS // V2.0</div>
+      <div style="font-size:9px; letter-spacing:.15em; color:#555;">2026 // RW1 // [ANALYSIS] // KELLY</div>
+      <div style="font-size:9px; letter-spacing:.15em; color:#555;">247 ELIGIBLE // BUDGET ≤104.9</div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:220px 1fr; gap:0; border:1px solid #222;">
+      <div style="border-right:1px solid #222;">
+        <div style="padding:8px 12px; border-bottom:1px solid #222; font-size:8px; letter-spacing:.2em; color:#444;">[NAVIGATION]</div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222;"><div style="font-size:9px; color:#333; letter-spacing:.12em;">01 [UPLOAD]</div></div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222;"><div style="font-size:9px; color:#333; letter-spacing:.12em;">02 [REVIEW]</div></div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222; background:#111;"><div style="font-size:9px; color:#fff; letter-spacing:.12em;">03 [ANALYSIS]</div></div>
+
+        <div style="padding:8px 12px; border-bottom:1px solid #222; font-size:8px; letter-spacing:.2em; color:#444; margin-top:4px;">[MODEL]</div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222; background:#111;">
+          <div style="font-size:9px; color:#fff; letter-spacing:.12em;">[KELLY CRITERION]</div>
+        </div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222; opacity:.3;">
+          <div style="font-size:9px; color:#555; letter-spacing:.12em;">[EV MODEL]</div>
+        </div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222; opacity:.3;">
+          <div style="font-size:9px; color:#555; letter-spacing:.12em;">[MONTE CARLO]</div>
+        </div>
+
+        <div style="padding:8px 12px; border-bottom:1px solid #222; font-size:8px; letter-spacing:.2em; color:#444; margin-top:4px;">[SORT]</div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222; background:#111;"><div style="font-size:9px; color:#e8401c; letter-spacing:.12em;">▶ KELLY SCORE</div></div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222;"><div style="font-size:9px; color:#333; letter-spacing:.12em;">P50 XPTS</div></div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222;"><div style="font-size:9px; color:#333; letter-spacing:.12em;">P95 CEILING</div></div>
+        <div style="padding:10px 12px; border-bottom:1px solid #222;"><div style="font-size:9px; color:#333; letter-spacing:.12em;">BUDGET</div></div>
+
+        <div style="padding:12px; font-size:8px; color:#444; line-height:1.8; letter-spacing:.1em; margin-top:8px;">
+          TOP KELLY: 0.74<br>
+          AVG P50: 174.2<br>
+          BEST CEILING: 312 PTS<br>
+          ELIGIBLE: 247
+        </div>
+      </div>
+
+      <!-- Main ranked list -->
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 16px; border-bottom:1px solid #222;">
+          <div style="font-size:8px; letter-spacing:.2em; color:#444;">[RANKED TEAMS] // SORTED BY KELLY</div>
+          <div style="font-size:8px; color:#555; letter-spacing:.1em;">247 TEAMS IN BUDGET</div>
+        </div>
+
+        <!-- #1 — TOP PICK -->
+        <div style="border-left:2px solid #e8401c; border-bottom:1px solid #222; background:#0c0c0c; padding:14px 16px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
+            <div>
+              <div style="font-size:8px; letter-spacing:.2em; color:#e8401c; margin-bottom:8px;">[#01] // TOP PICK</div>
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                <span class="tcolor" style="background:#06d3bf; width:10px; height:10px;"></span>
+                <span class="tcolor" style="background:#dd1818; width:10px; height:10px;"></span>
+                <span style="font-size:9px; color:#aaa; letter-spacing:.08em;">LEC(2X) · LAW · OCO · BEA · BOT</span>
+                <span style="font-size:9px; color:#555;">102.5ML</span>
+              </div>
+              <!-- Distribution bar -->
+              <div style="position:relative; height:6px; background:#151515; margin-bottom:4px; width:360px;">
+                <div style="position:absolute; left:20%; width:60%; height:100%; background:#2a2a2a;"></div>
+                <div style="position:absolute; left:20%; width:30%; height:100%; background:#3a3a3a;"></div>
+                <div style="position:absolute; left:50%; width:2px; height:12px; top:-3px; background:#fff;"></div>
+              </div>
+              <div style="display:flex; justify-content:space-between; width:360px;">
+                <span style="font-size:7px; color:#333;">P5:91</span>
+                <span style="font-size:7px; color:#444;">P25:147</span>
+                <span style="font-size:7px; color:#fff;">P50:176</span>
+                <span style="font-size:7px; color:#444;">P75:259</span>
+                <span style="font-size:7px; color:#333;">P95:287</span>
+              </div>
+            </div>
+            <div style="display:flex; gap:24px; align-items:center; flex-shrink:0;">
+              <div>
+                <div style="font-size:7px; letter-spacing:.2em; color:#444; margin-bottom:4px;">AVG XPTS</div>
+                <div style="font-size:18px; font-weight:700;">176.4</div>
+              </div>
+              <div>
+                <div style="font-size:7px; letter-spacing:.2em; color:#444; margin-bottom:4px;">KELLY</div>
+                <div style="font-size:24px; font-weight:700; color:#e8401c;">0.74</div>
+              </div>
+              <div class="btn-wf fill" style="padding:12px 16px; text-align:center; font-size:9px;">[PICK]</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- #2 -->
+        <div style="border-bottom:1px solid #1a1a1a; padding:10px 16px; opacity:0.75;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
+            <div>
+              <div style="font-size:8px; letter-spacing:.15em; color:#444; margin-bottom:6px;">[#02]</div>
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <span class="tcolor" style="background:#888; width:8px; height:8px;"></span><span class="tcolor" style="background:#555; width:8px; height:8px;"></span>
+                <span style="font-size:9px; color:#666; letter-spacing:.08em;">RUS(2X) · NOR · PIA · HAM · BOT — 104.1ML</span>
+              </div>
+              <div style="position:relative; height:4px; background:#111; width:280px;">
+                <div style="position:absolute; left:22%; width:56%; height:100%; background:#2a2a2a;"></div>
+                <div style="position:absolute; left:51%; width:2px; height:8px; top:-2px; background:#888;"></div>
+              </div>
+            </div>
+            <div style="display:flex; gap:24px; align-items:center; flex-shrink:0;">
+              <div><div style="font-size:7px; color:#333; margin-bottom:3px; letter-spacing:.15em;">AVG XPTS</div><div style="font-size:14px; color:#888;">177.0</div></div>
+              <div><div style="font-size:7px; color:#333; margin-bottom:3px; letter-spacing:.15em;">KELLY</div><div style="font-size:18px; color:#888;">0.71</div></div>
+              <div class="btn-wf sm" style="text-align:center;">[PICK]</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- #3 -->
+        <div style="border-bottom:1px solid #1a1a1a; padding:10px 16px; opacity:0.5;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
+            <div>
+              <div style="font-size:8px; letter-spacing:.15em; color:#333; margin-bottom:6px;">[#03]</div>
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <span class="tcolor" style="background:#666; width:8px; height:8px;"></span><span class="tcolor" style="background:#444; width:8px; height:8px;"></span>
+                <span style="font-size:9px; color:#555; letter-spacing:.08em;">NOR(2X) · VER · PIA · LEC · BOT — 99.8ML</span>
+              </div>
+              <div style="position:relative; height:4px; background:#111; width:280px;">
+                <div style="position:absolute; left:18%; width:60%; height:100%; background:#222;"></div>
+                <div style="position:absolute; left:48%; width:2px; height:8px; top:-2px; background:#666;"></div>
+              </div>
+            </div>
+            <div style="display:flex; gap:24px; align-items:center; flex-shrink:0;">
+              <div><div style="font-size:7px; color:#333; margin-bottom:3px; letter-spacing:.15em;">AVG XPTS</div><div style="font-size:14px; color:#555;">175.0</div></div>
+              <div><div style="font-size:7px; color:#333; margin-bottom:3px; letter-spacing:.15em;">KELLY</div><div style="font-size:18px; color:#555;">0.69</div></div>
+              <div class="btn-wf sm" style="text-align:center; opacity:.5;">[PICK]</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ph" style="height:80px; margin:0; border-radius:0;">... [244 MORE TEAMS] ...</div>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<script>
+function setVar(v) {
+  document.querySelectorAll('.variation').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.vtab').forEach(el => el.classList.remove('active'));
+  document.getElementById('var-' + v).classList.add('active');
+  event.target.classList.add('active');
+  // reset to screen 0
+  setScreenDirect(currentScreen);
+}
+
+let currentScreen = 0;
+
+function setScreen(n) {
+  currentScreen = n;
+  document.querySelectorAll('.stab').forEach((el, i) => {
+    el.classList.toggle('active', i === n);
+  });
+  setScreenDirect(n);
+}
+
+function setScreenDirect(n) {
+  const activeVar = document.querySelector('.variation.active');
+  if (!activeVar) return;
+  activeVar.querySelectorAll('.screen').forEach((el, i) => {
+    el.classList.toggle('active', i === n);
+  });
+}
+
+// Register tweaks
+window.addEventListener('message', e => {
+  if (e.data?.type === '__activate_edit_mode') {
+    document.getElementById('tweakPanel').style.display = 'block';
+  }
+  if (e.data?.type === '__deactivate_edit_mode') {
+    document.getElementById('tweakPanel').style.display = 'none';
+  }
+});
+window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+</script>
+
+<!-- Tweaks panel -->
+<div id="tweakPanel" style="display:none; position:fixed; bottom:24px; right:24px; background:#0a0a0a; border:1px solid #333; padding:16px; z-index:999; width:220px;">
+  <div style="font-size:9px; letter-spacing:.2em; color:#555; margin-bottom:12px; text-transform:uppercase;">Tweaks</div>
+  <div style="font-size:10px; color:#888; line-height:1.8;">
+    Use the tabs at top to switch between the 3 layout variations (A/B/C) and the 3 screens (Upload / Review / Analysis).
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RHTER — F1 Fantasy Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; }
+  body {
+    background: #0a0a0a;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    overflow-x: hidden;
+  }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #111; }
+  ::-webkit-scrollbar-thumb { background: #2a2a2a; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  @keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+  }
+  @keyframes progressFill {
+    from { width: 0%; }
+    to { width: var(--target-w); }
+  }
+  .fade-up { animation: fadeUp 0.35s ease forwards; }
+  .pulse { animation: pulse 1.8s ease-in-out infinite; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── MOCK DATA ──────────────────────────────────────────────────────────────
+const TEAM_COLORS = {
+  MER: '#06d3bf', FER: '#dd1818', RBR: '#1e41ff', MCL: '#ff6700',
+  AMR: '#006b3c', WIL: '#005aff', ALP: '#ff87bc', HAA: '#b6babd',
+  KIC: '#52e252', SAU: '#9b0000',
+};
+
+const MOCK_TEAMS = Array.from({ length: 312 }, (_, i) => {
+  const drivers = [
+    ['LEC','LAW','OCO','BEA','BOT'],
+    ['RUS','NOR','PIA','HAM','BOT'],
+    ['NOR','VER','PIA','LEC','BOT'],
+    ['VER','HAM','RUS','ALO','TSU'],
+    ['SAI','ALO','NOR','OCO','ZHO'],
+    ['LEC','VER','NOR','ALO','GAS'],
+    ['HAM','PIA','SAI','LAW','HUL'],
+    ['RUS','LEC','OCO','ALB','BOT'],
+  ][i % 8];
+  const mults = ['2X', null, null, null, null];
+  const cons = [
+    [{team:'MER',color:TEAM_COLORS.MER},{team:'FER',color:TEAM_COLORS.FER}],
+    [{team:'MER',color:TEAM_COLORS.MER},{team:'MCL',color:TEAM_COLORS.MCL}],
+    [{team:'MCL',color:TEAM_COLORS.MCL},{team:'RBR',color:TEAM_COLORS.RBR}],
+    [{team:'RBR',color:TEAM_COLORS.RBR},{team:'AMR',color:TEAM_COLORS.AMR}],
+    [{team:'FER',color:TEAM_COLORS.FER},{team:'ALP',color:TEAM_COLORS.ALP}],
+    [{team:'FER',color:TEAM_COLORS.FER},{team:'RBR',color:TEAM_COLORS.RBR}],
+    [{team:'MER',color:TEAM_COLORS.MER},{team:'AMR',color:TEAM_COLORS.AMR}],
+    [{team:'MER',color:TEAM_COLORS.MER},{team:'WIL',color:TEAM_COLORS.WIL}],
+  ][i % 8];
+
+  const base = 160 + Math.sin(i * 0.7) * 30;
+  const kelly = parseFloat((0.45 + Math.cos(i * 0.4) * 0.28).toFixed(2));
+  const flagged = [3, 17, 44, 61, 88, 122, 197].includes(i);
+  const budget = parseFloat((95 + Math.sin(i * 0.3) * 15).toFixed(1));
+
+  return {
+    id: i,
+    row: i + 1,
+    budget,
+    drivers: drivers.map((d, j) => ({ name: d, multiplier: mults[j] })),
+    constructors: cons,
+    p5: Math.round(base * 0.55),
+    p25: Math.round(base * 0.85),
+    p50: Math.round(base),
+    p75: Math.round(base * 1.45),
+    p95: Math.round(base * 1.65),
+    avg_xpts: parseFloat((base * 1.05).toFixed(1)),
+    kelly,
+    flagged,
+    flagReason: flagged ? 'P95 value appears high — verify against source image' : null,
+    confirmed: !flagged,
+  };
+}).sort((a, b) => b.kelly - a.kelly);
+
+// ── DESIGN TOKENS ─────────────────────────────────────────────────────────
+const T = {
+  bg: '#0a0a0a',
+  bg1: '#111',
+  bg2: '#161616',
+  bg3: '#1c1c1c',
+  border: '#222',
+  border2: '#2a2a2a',
+  muted: '#444',
+  sub: '#666',
+  dim: '#888',
+  text: '#e8e8e8',
+  white: '#ffffff',
+  accent: '#e8401c',
+  accentDim: 'rgba(232,64,28,0.12)',
+  accentBorder: 'rgba(232,64,28,0.4)',
+};
+
+// ── PRIMITIVES ─────────────────────────────────────────────────────────────
+const Label = ({ children, color = T.muted, style }) => (
+  <span style={{ fontFamily: 'Space Mono', fontSize: 9, letterSpacing: '0.18em', textTransform: 'uppercase', color, ...style }}>
+    {children}
+  </span>
+);
+
+const Mono = ({ children, size = 12, color = T.text, weight = 400, style }) => (
+  <span style={{ fontFamily: 'Space Mono', fontSize: size, color, fontWeight: weight, ...style }}>
+    {children}
+  </span>
+);
+
+const Btn = ({ children, variant = 'outline', size = 'md', onClick, disabled, style }) => {
+  const [hov, setHov] = useState(false);
+  const base = {
+    fontFamily: 'Space Mono', letterSpacing: '0.12em', textTransform: 'uppercase',
+    border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+    transition: 'all 0.12s', outline: 'none', display: 'inline-flex',
+    alignItems: 'center', justifyContent: 'center', gap: 6, opacity: disabled ? 0.35 : 1,
+  };
+  const sizes = {
+    sm: { fontSize: 9, padding: '5px 12px' },
+    md: { fontSize: 10, padding: '8px 18px' },
+    lg: { fontSize: 11, padding: '12px 28px' },
+  };
+  const variants = {
+    outline: { background: hov ? T.bg3 : 'transparent', border: `1px solid ${hov ? T.dim : T.border2}`, color: hov ? T.white : T.dim },
+    fill: { background: hov ? '#f0f0f0' : T.white, color: '#000', border: `1px solid ${T.white}` },
+    danger: { background: hov ? T.accentDim : 'transparent', border: `1px solid ${T.accentBorder}`, color: T.accent },
+    ghost: { background: 'transparent', border: '1px solid transparent', color: hov ? T.text : T.sub },
+  };
+  return (
+    <button
+      style={{ ...base, ...sizes[size], ...variants[variant], ...style }}
+      onClick={onClick} disabled={disabled}
+      onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+    >
+      {children}
+    </button>
+  );
+};
+
+const Divider = ({ style }) => (
+  <div style={{ height: 1, background: T.border, ...style }} />
+);
+
+const TeamDot = ({ color, size = 8 }) => (
+  <span style={{ display: 'inline-block', width: size, height: size, borderRadius: '50%', background: color, flexShrink: 0 }} />
+);
+
+// ── DISTRIBUTION BAR ───────────────────────────────────────────────────────
+const DistBar = ({ p5, p25, p50, p75, p95, height = 6, dim = false }) => {
+  const min = 50, max = 350;
+  const pct = v => ((v - min) / (max - min)) * 100;
+  return (
+    <div style={{ position: 'relative', height, background: T.bg3, width: '100%' }}>
+      {/* p25-p75 IQR box */}
+      <div style={{
+        position: 'absolute', top: 0, height: '100%',
+        left: `${pct(p25)}%`, width: `${pct(p75) - pct(p25)}%`,
+        background: dim ? T.border2 : T.border,
+      }} />
+      {/* whisker line p5-p95 */}
+      <div style={{
+        position: 'absolute', top: '40%', height: '20%',
+        left: `${pct(p5)}%`, width: `${pct(p95) - pct(p5)}%`,
+        background: dim ? '#1e1e1e' : T.muted,
+      }} />
+      {/* median */}
+      <div style={{
+        position: 'absolute', top: -3, width: 2, height: height + 6,
+        left: `${pct(p50)}%`, background: dim ? T.muted : T.white,
+      }} />
+    </div>
+  );
+};
+
+// ── PERCENTILE LABELS ──────────────────────────────────────────────────────
+const PctLabels = ({ p5, p25, p50, p75, p95 }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
+    {[['P5', p5, T.muted], ['P25', p25, T.sub], ['P50', p50, T.white], ['P75', p75, T.sub], ['P95', p95, T.muted]].map(([l, v, c]) => (
+      <div key={l} style={{ textAlign: 'center' }}>
+        <Label color={T.muted} style={{ fontSize: 7 }}>{l}</Label>
+        <div><Mono size={9} color={c}>{v}</Mono></div>
+      </div>
+    ))}
+  </div>
+);
+
+// ── STEP BAR ───────────────────────────────────────────────────────────────
+const StepBar = ({ step }) => {
+  const steps = ['01 UPLOAD', '02 REVIEW', '03 ANALYSIS'];
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+      {steps.map((s, i) => (
+        <React.Fragment key={i}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 22, height: 22, border: `1px solid ${i < step ? T.muted : i === step ? T.white : T.border}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: i === step ? T.white : 'transparent',
+              transition: 'all 0.2s',
+            }}>
+              {i < step
+                ? <svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5" fill="none" stroke={T.muted} strokeWidth="1.5"/></svg>
+                : <Mono size={9} color={i === step ? '#000' : T.border}>{i + 1}</Mono>
+              }
+            </div>
+            <Label color={i === step ? T.white : i < step ? T.sub : T.border} style={{ fontSize: 9 }}>{s}</Label>
+          </div>
+          {i < 2 && (
+            <div style={{ width: 48, height: 1, background: i < step ? T.muted : T.border, margin: '0 16px' }} />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+};
+
+// ── STEP 1: UPLOAD ─────────────────────────────────────────────────────────
+const StepUpload = ({ onNext }) => {
+  const [dragging, setDragging] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [fileName, setFileName] = useState(null);
+  const fileRef = useRef();
+
+  const simulate = (name) => {
+    setFileName(name);
+    setLoading(true);
+    setProgress(0);
+    const steps = [8, 23, 41, 55, 68, 80, 91, 97, 100];
+    steps.forEach((p, i) => {
+      setTimeout(() => {
+        setProgress(p);
+        if (p === 100) {
+          setTimeout(() => onNext(), 600);
+        }
+      }, i * 280);
+    });
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setDragging(false);
+    const f = e.dataTransfer.files[0];
+    if (f) simulate(f.name);
+  };
+
+  return (
+    <div className="fade-up" style={{ maxWidth: 840, margin: '0 auto' }}>
+      {/* Drop zone */}
+      <div
+        onDragOver={e => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+        onClick={() => !loading && fileRef.current.click()}
+        style={{
+          border: `1px ${dragging ? 'solid' : 'dashed'} ${dragging ? T.white : T.border2}`,
+          background: dragging ? T.bg2 : T.bg1,
+          minHeight: 360, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 28,
+          cursor: loading ? 'default' : 'pointer',
+          transition: 'all 0.15s', marginBottom: 24,
+          padding: 40,
+        }}
+      >
+        <input ref={fileRef} type="file" accept=".webp" style={{ display: 'none' }}
+          onChange={e => e.target.files[0] && simulate(e.target.files[0].name)} />
+
+        {!loading ? (
+          <>
+            <div style={{
+              width: 64, height: 64, border: `1px solid ${dragging ? T.sub : T.border2}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'border-color 0.15s',
+            }}>
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <line x1="14" y1="3" x2="14" y2="19" stroke={dragging ? T.white : T.muted} strokeWidth="1.5"/>
+                <polyline points="8,9 14,3 20,9" fill="none" stroke={dragging ? T.white : T.muted} strokeWidth="1.5"/>
+                <line x1="4" y1="24" x2="24" y2="24" stroke={dragging ? T.white : T.muted} strokeWidth="1.5"/>
+              </svg>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <Label style={{ fontSize: 11 }} color={T.text}>DROP RHTER WEBP FILE HERE</Label>
+              <div style={{ marginTop: 8 }}><Label color={T.sub}>or click to browse — accepted: .webp</Label></div>
+            </div>
+            <Btn variant="fill" size="md">SELECT FILE</Btn>
+          </>
+        ) : (
+          <div style={{ width: '100%', maxWidth: 420, textAlign: 'center' }}>
+            <Label color={T.dim} style={{ fontSize: 9 }}>
+              {progress < 100 ? 'EXTRACTING DATA...' : 'COMPLETE'}
+            </Label>
+            <div style={{ fontSize: 10, color: T.sub, marginTop: 6, marginBottom: 20, fontFamily: 'Space Mono' }}>
+              {fileName}
+            </div>
+            {/* Progress bar */}
+            <div style={{ height: 2, background: T.border, position: 'relative', overflow: 'hidden' }}>
+              <div style={{
+                position: 'absolute', left: 0, top: 0, height: '100%',
+                background: progress === 100 ? T.white : T.accent,
+                width: `${progress}%`, transition: 'width 0.25s ease',
+              }} />
+            </div>
+            <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+              <Label color={T.muted} style={{ fontSize: 8 }}>
+                {progress < 30 ? 'UPLOADING' : progress < 60 ? 'PARSING ROWS' : progress < 90 ? 'VALIDATING' : 'FINALISING'}
+              </Label>
+              <Label color={T.dim} style={{ fontSize: 8 }}>{progress}%</Label>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Info grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1, border: `1px solid ${T.border}`, background: T.border }}>
+        {[
+          { label: 'WHAT HAPPENS NEXT', lines: ['→ File uploads', '→ Rows are extracted', '→ Values auto-validated', '→ Anomalies flagged'] },
+          { label: 'TYPICAL EXTRACTION', lines: ['~8 seconds', 'for 300-team dataset', '', ''] },
+          { label: 'LAST SESSION', lines: ['2026 RW1', '247 teams', '3 flags', ''] },
+        ].map(({ label, lines }) => (
+          <div key={label} style={{ background: T.bg1, padding: '16px 20px' }}>
+            <Label style={{ display: 'block', marginBottom: 12 }}>{label}</Label>
+            {lines.map((l, i) => <div key={i} style={{ fontFamily: 'Space Mono', fontSize: 10, color: T.sub, lineHeight: '1.9', height: '1.9em' }}>{l}</div>)}
+          </div>
+        ))}
+      </div>
+
+      {/* Demo button */}
+      <div style={{ marginTop: 20, textAlign: 'center' }}>
+        <Btn variant="ghost" size="sm" onClick={() => simulate('RHTER_2026_RW1.webp')}>
+          SIMULATE WITH DEMO DATA →
+        </Btn>
+      </div>
+    </div>
+  );
+};
+
+// ── STEP 2: REVIEW ─────────────────────────────────────────────────────────
+const StepReview = ({ teams, onNext, onBack }) => {
+  const [budget, setBudget] = useState(104.9);
+  const [budgetInput, setBudgetInput] = useState('104.9');
+  const [teamsData, setTeamsData] = useState(teams);
+  const [showFlagged, setShowFlagged] = useState(false);
+  const [editingRow, setEditingRow] = useState(null);
+
+  const flagged = teamsData.filter(t => t.flagged);
+  const confirmed = teamsData.filter(t => !t.flagged);
+  const eligible = teamsData.filter(t => t.budget <= budget);
+  const display = showFlagged ? teamsData.filter(t => t.flagged) : teamsData.slice(0, 40);
+
+  const confirmRow = (id) => setTeamsData(prev => prev.map(t => t.id === id ? { ...t, flagged: false, confirmed: true } : t));
+  const canContinue = flagged.length === 0;
+
+  const commitBudget = () => {
+    const v = parseFloat(budgetInput);
+    if (!isNaN(v) && v > 0) setBudget(v);
+    else setBudgetInput(String(budget));
+  };
+
+  return (
+    <div className="fade-up" style={{ maxWidth: 1100, margin: '0 auto' }}>
+      {/* Budget card */}
+      <div style={{
+        border: `1px solid ${T.accentBorder}`,
+        background: T.accentDim,
+        padding: '20px 28px', marginBottom: 20,
+        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 32, alignItems: 'center',
+      }}>
+        <div>
+          <Label color={T.accent} style={{ display: 'block', marginBottom: 12 }}>SET YOUR BUDGET LIMIT</Label>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <input
+              type="number"
+              value={budgetInput}
+              onChange={e => setBudgetInput(e.target.value)}
+              onBlur={commitBudget}
+              onKeyDown={e => e.key === 'Enter' && commitBudget()}
+              step="0.1"
+              style={{
+                background: 'transparent', border: 'none', borderBottom: `1px solid ${T.accent}`,
+                color: T.white, fontFamily: 'Space Mono', fontSize: 32, fontWeight: 700,
+                width: 120, outline: 'none', padding: '2px 0',
+              }}
+            />
+            <Label color={T.sub} style={{ fontSize: 11 }}>ML</Label>
+          </div>
+          <Label color={T.sub} style={{ marginTop: 6, display: 'block' }}>teams over this will be hidden in analysis</Label>
+        </div>
+        <div>
+          <Label style={{ display: 'block', marginBottom: 8 }}>TEAMS IN BUDGET</Label>
+          <div style={{ fontFamily: 'Space Mono', fontSize: 28, fontWeight: 700 }}>
+            {eligible.length} <span style={{ fontSize: 14, color: T.sub }}>/ {teamsData.length}</span>
+          </div>
+          <Label color={T.sub} style={{ marginTop: 4, display: 'block' }}>
+            {teamsData.length - eligible.length} teams above limit
+          </Label>
+        </div>
+        <div>
+          <Label style={{ display: 'block', marginBottom: 8 }}>EXTRACTION STATS</Label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {[
+              ['Teams parsed', teamsData.length],
+              ['Flagged', flagged.length, flagged.length > 0 ? T.accent : T.sub],
+              ['Confidence', '98.2%'],
+            ].map(([k, v, c]) => (
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Label color={T.sub}>{k}</Label>
+                <Mono size={10} color={c || T.text}>{v}</Mono>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Table toolbar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 16px', background: T.bg2, border: `1px solid ${T.border}`,
+        borderBottom: 'none',
+      }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Btn variant={showFlagged ? 'danger' : 'outline'} size="sm" onClick={() => setShowFlagged(!showFlagged)}>
+            {showFlagged ? '⚑ FLAGGED ONLY' : '⚑ FLAGGED ONLY'}
+          </Btn>
+          <Btn variant={!showFlagged ? 'outline' : 'ghost'} size="sm" onClick={() => setShowFlagged(false)}>ALL ROWS</Btn>
+        </div>
+        <Label color={flagged.length > 0 ? T.accent : T.sub}>
+          {flagged.length > 0 ? `${flagged.length} FLAGS REQUIRE ATTENTION` : 'ALL CLEAR'}
+        </Label>
+      </div>
+
+      {/* Column headers */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '44px 84px 1fr 76px 76px 76px 72px 100px',
+        gap: 0, padding: '7px 16px',
+        background: T.bg2, border: `1px solid ${T.border}`, borderBottom: 'none',
+      }}>
+        {['ROW','BUDGET','DRIVERS + CONSTRUCTORS','P50','P75','P95','KELLY','STATUS'].map(h => (
+          <Label key={h} color={T.muted} style={{ fontSize: 8 }}>{h}</Label>
+        ))}
+      </div>
+
+      {/* Rows */}
+      <div style={{ border: `1px solid ${T.border}` }}>
+        {display.map((team, idx) => (
+          <ReviewRow
+            key={team.id}
+            team={team}
+            onConfirm={confirmRow}
+            isEditing={editingRow === team.id}
+            onEdit={() => setEditingRow(editingRow === team.id ? null : team.id)}
+          />
+        ))}
+        {!showFlagged && teamsData.length > 40 && (
+          <div style={{ padding: '12px 16px', borderTop: `1px solid ${T.border}`, background: T.bg1 }}>
+            <Label color={T.muted}>... {teamsData.length - 40} more rows (all auto-confirmed)</Label>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom actions */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '16px 0', marginTop: 16,
+      }}>
+        <Btn variant="outline" size="md" onClick={onBack}>← BACK</Btn>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          {!canContinue && (
+            <Label color={T.accent}>{flagged.length} FLAG{flagged.length !== 1 ? 'S' : ''} UNRESOLVED</Label>
+          )}
+          <Btn variant="fill" size="md" disabled={!canContinue} onClick={() => onNext(budget, teamsData)}>
+            APPROVE DATA + CONTINUE →
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ReviewRow = ({ team, onConfirm, isEditing, onEdit }) => {
+  const [hov, setHov] = useState(false);
+  return (
+    <div>
+      <div
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          display: 'grid', gridTemplateColumns: '44px 84px 1fr 76px 76px 76px 72px 100px',
+          gap: 0, padding: '10px 16px', alignItems: 'center',
+          borderTop: team.flagged ? `1px solid ${T.accentBorder}` : `1px solid ${T.border}`,
+          borderLeft: team.flagged ? `2px solid ${T.accent}` : `2px solid transparent`,
+          background: team.flagged ? T.accentDim : hov ? T.bg2 : T.bg1,
+          transition: 'background 0.1s',
+        }}
+      >
+        <Mono size={9} color={team.flagged ? T.accent : T.muted}>{String(team.row).padStart(3,'0')}</Mono>
+        <Mono size={10}>{team.budget.toFixed(1)}</Mono>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {team.constructors.map((c, i) => <TeamDot key={i} color={c.color} />)}
+          <span style={{ fontFamily: 'Space Mono', fontSize: 9, color: T.sub, letterSpacing: '0.06em' }}>
+            {team.drivers.map(d => d.multiplier ? `${d.name}(${d.multiplier})` : d.name).join(' · ')}
+          </span>
+        </div>
+        <Mono size={10}>{team.p50}</Mono>
+        <Mono size={10}>{team.p75}</Mono>
+        <Mono size={10} color={team.flagged ? T.accent : T.text}>{team.p95}{team.flagged ? ' ⚑' : ''}</Mono>
+        <Mono size={10}>{team.kelly.toFixed(2)}</Mono>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {team.flagged ? (
+            <>
+              <Btn variant="danger" size="sm" onClick={onEdit}>{isEditing ? 'CLOSE' : 'EDIT'}</Btn>
+              <Btn variant="outline" size="sm" onClick={() => onConfirm(team.id)}>OK</Btn>
+            </>
+          ) : (
+            <Label color={T.border2} style={{ fontSize: 8, letterSpacing: '0.15em' }}>CONFIRMED</Label>
+          )}
+        </div>
+      </div>
+      {isEditing && team.flagged && (
+        <div style={{
+          padding: '10px 16px', background: '#120a08',
+          borderLeft: `2px solid ${T.accent}`, borderBottom: `1px solid ${T.accentBorder}`,
+        }}>
+          <Label color={T.accent} style={{ display: 'block', marginBottom: 8 }}>⚑ {team.flagReason}</Label>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            {[['P50', team.p50], ['P75', team.p75], ['P95', team.p95], ['KELLY', team.kelly.toFixed(2)]].map(([k, v]) => (
+              <div key={k}>
+                <Label color={T.sub} style={{ display: 'block', marginBottom: 4 }}>{k}</Label>
+                <input defaultValue={v} style={{
+                  background: T.bg2, border: `1px solid ${T.border}`, color: T.text,
+                  fontFamily: 'Space Mono', fontSize: 11, padding: '4px 8px', width: 80, outline: 'none',
+                }} />
+              </div>
+            ))}
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+              <Btn variant="fill" size="sm" onClick={() => onConfirm(team.id)}>CONFIRM VALUES</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── STEP 3: ANALYSIS ───────────────────────────────────────────────────────
+const StepAnalysis = ({ teams, budget, onBack }) => {
+  const [sortKey, setSortKey] = useState('kelly');
+  const [model] = useState('KELLY CRITERION');
+  const [pickedId, setPickedId] = useState(null);
+
+  const eligibleTeams = teams.filter(t => t.budget <= budget && !t.flagged);
+
+  const sorted = [...eligibleTeams].sort((a, b) => {
+    if (sortKey === 'kelly') return b.kelly - a.kelly;
+    if (sortKey === 'p50') return b.p50 - a.p50;
+    if (sortKey === 'p95') return b.p95 - a.p95;
+    if (sortKey === 'budget') return a.budget - b.budget;
+    return 0;
+  });
+
+  const top = sorted[0];
+  const rest = sorted.slice(1, 20);
+
+  const SortBtn = ({ k, label }) => (
+    <button
+      onClick={() => setSortKey(k)}
+      style={{
+        background: 'transparent', border: 'none', cursor: 'pointer',
+        fontFamily: 'Space Mono', fontSize: 9, letterSpacing: '0.15em',
+        textTransform: 'uppercase', padding: '4px 0',
+        color: sortKey === k ? T.white : T.muted,
+        borderBottom: sortKey === k ? `1px solid ${T.accent}` : '1px solid transparent',
+        transition: 'all 0.1s',
+      }}
+    >
+      {sortKey === k ? '▶ ' : ''}{label}
+    </button>
+  );
+
+  return (
+    <div className="fade-up" style={{ maxWidth: 1100, margin: '0 auto' }}>
+      {/* Controls bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 20px', border: `1px solid ${T.border}`,
+        background: T.bg2, marginBottom: 1,
+      }}>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+          <div>
+            <Label color={T.muted} style={{ display: 'block', marginBottom: 6 }}>MODEL</Label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Btn variant="fill" size="sm">{model}</Btn>
+              <Btn variant="ghost" size="sm" style={{ opacity: 0.3 }}>EV MODEL</Btn>
+              <Btn variant="ghost" size="sm" style={{ opacity: 0.3 }}>MONTE CARLO</Btn>
+            </div>
+          </div>
+          <div style={{ width: 1, height: 32, background: T.border }} />
+          <div>
+            <Label color={T.muted} style={{ display: 'block', marginBottom: 6 }}>SORT BY</Label>
+            <div style={{ display: 'flex', gap: 16 }}>
+              {[['kelly', 'KELLY SCORE'], ['p50', 'P50 XPTS'], ['p95', 'P95 CEILING'], ['budget', 'BUDGET']].map(([k, l]) => (
+                <SortBtn key={k} k={k} label={l} />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <Label color={T.sub} style={{ display: 'block' }}>ELIGIBLE TEAMS</Label>
+          <Mono size={22} weight={700}>{eligibleTeams.length}</Mono>
+          <Label color={T.muted} style={{ display: 'block' }}>BUDGET ≤ {budget} ML</Label>
+        </div>
+      </div>
+
+      {/* Top pick */}
+      {top && (
+        <div style={{
+          border: `1px solid ${T.accentBorder}`,
+          borderLeft: `3px solid ${T.accent}`,
+          background: T.accentDim, padding: '18px 24px', marginBottom: 1,
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 120px 100px', gap: 24, alignItems: 'center' }}>
+            <div>
+              <Label color={T.accent} style={{ display: 'block', marginBottom: 10 }}>#01 — TOP PICK — {model}</Label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                {top.constructors.map((c, i) => <TeamDot key={i} color={c.color} size={10} />)}
+                <Mono size={10} color={T.sub}>
+                  {top.constructors.map(c => c.team).join(' + ')}
+                </Mono>
+                <span style={{ color: T.border, fontFamily: 'Space Mono', fontSize: 10 }}>·</span>
+                <Mono size={10} color={T.dim}>
+                  {top.drivers.map(d => d.multiplier ? `${d.name}(${d.multiplier})` : d.name).join(' · ')}
+                </Mono>
+                <span style={{ color: T.border, fontFamily: 'Space Mono', fontSize: 10 }}>·</span>
+                <Mono size={9} color={T.muted}>{top.budget.toFixed(1)} ML</Mono>
+              </div>
+              <DistBar p5={top.p5} p25={top.p25} p50={top.p50} p75={top.p75} p95={top.p95} height={8} />
+              <PctLabels p5={top.p5} p25={top.p25} p50={top.p50} p75={top.p75} p95={top.p95} />
+            </div>
+            <div>
+              <Label style={{ display: 'block', marginBottom: 4 }}>AVG EXPECTED PTS</Label>
+              <Mono size={28} weight={700}>{top.avg_xpts}</Mono>
+            </div>
+            <div>
+              <Label style={{ display: 'block', marginBottom: 4 }}>KELLY SCORE</Label>
+              <Mono size={36} weight={700} color={T.accent}>{top.kelly.toFixed(2)}</Mono>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              {pickedId === top.id
+                ? <div style={{ border: `1px solid ${T.accent}`, padding: '12px 16px', color: T.accent, fontFamily: 'Space Mono', fontSize: 10, letterSpacing: '0.15em' }}>✓ PICKED</div>
+                : <Btn variant="fill" size="lg" onClick={() => setPickedId(top.id)}>PICK THIS TEAM</Btn>
+              }
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rest of list */}
+      <div style={{ border: `1px solid ${T.border}` }}>
+        {/* headers */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: '40px 1fr 120px 80px 80px',
+          gap: 0, padding: '7px 20px', background: T.bg2, borderBottom: `1px solid ${T.border}`,
+        }}>
+          {['RANK', 'LINEUP', 'AVG XPTS', sortKey === 'kelly' ? 'KELLY ↓' : 'KELLY', ''].map((h, i) => (
+            <Label key={i} color={T.muted} style={{ fontSize: 8 }}>{h}</Label>
+          ))}
+        </div>
+        {rest.map((team, i) => (
+          <AnalysisRow
+            key={team.id}
+            team={team}
+            rank={i + 2}
+            picked={pickedId === team.id}
+            onPick={() => setPickedId(pickedId === team.id ? null : team.id)}
+          />
+        ))}
+        {eligibleTeams.length > 21 && (
+          <div style={{ padding: '12px 20px', borderTop: `1px solid ${T.border}`, background: T.bg1 }}>
+            <Label color={T.muted}>... {eligibleTeams.length - 21} more teams below</Label>
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Btn variant="outline" size="md" onClick={onBack}>← BACK TO REVIEW</Btn>
+        {pickedId && (
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <Label color={T.accent}>TEAM #{sorted.findIndex(t => t.id === pickedId) + 1} SELECTED</Label>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const AnalysisRow = ({ team, rank, picked, onPick }) => {
+  const [hov, setHov] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: 'grid', gridTemplateColumns: '40px 1fr 120px 80px 80px',
+        gap: 0, padding: '12px 20px', alignItems: 'center',
+        borderTop: `1px solid ${T.border}`,
+        background: picked ? T.bg3 : hov ? T.bg2 : T.bg1,
+        borderLeft: picked ? `2px solid ${T.accent}` : '2px solid transparent',
+        transition: 'background 0.1s',
+      }}
+    >
+      <Mono size={11} color={T.muted}>{String(rank).padStart(2,'0')}</Mono>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          {team.constructors.map((c, i) => <TeamDot key={i} color={c.color} size={8} />)}
+          <Mono size={9} color={T.sub}>
+            {team.constructors.map(c => c.team).join(' + ')} · {team.drivers.map(d => d.multiplier ? `${d.name}(${d.multiplier})` : d.name).join(' · ')} · {team.budget.toFixed(1)} ML
+          </Mono>
+        </div>
+        <DistBar p5={team.p5} p25={team.p25} p50={team.p50} p75={team.p75} p95={team.p95} height={4} dim={true} />
+      </div>
+      <Mono size={13} weight={700}>{team.avg_xpts}</Mono>
+      <Mono size={15} weight={700} color={T.dim}>{team.kelly.toFixed(2)}</Mono>
+      <div>
+        {picked
+          ? <Btn variant="danger" size="sm" onClick={onPick} style={{ fontSize: 8 }}>✓ PICKED</Btn>
+          : <Btn variant="outline" size="sm" onClick={onPick}>PICK</Btn>
+        }
+      </div>
+    </div>
+  );
+};
+
+// ── ROOT APP ───────────────────────────────────────────────────────────────
+const App = () => {
+  const saved = (() => { try { return JSON.parse(localStorage.getItem('rhter_state') || '{}'); } catch { return {}; } })();
+  const [step, setStep] = useState(saved.step || 0);
+  const [teams, setTeams] = useState(MOCK_TEAMS);
+  const [budget, setBudget] = useState(saved.budget || 104.9);
+
+  useEffect(() => {
+    localStorage.setItem('rhter_state', JSON.stringify({ step, budget }));
+  }, [step, budget]);
+
+  return (
+    <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', flexDirection: 'column' }}>
+      {/* Top bar */}
+      <div style={{
+        padding: '14px 40px', borderBottom: `1px solid ${T.border}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: '#080808', position: 'sticky', top: 0, zIndex: 50,
+      }}>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'baseline' }}>
+          <span style={{ fontFamily: 'Space Mono', fontSize: 13, fontWeight: 700, letterSpacing: '0.1em' }}>RHTER</span>
+          <Label color={T.muted} style={{ fontSize: 8 }}>F1 FANTASY — 2026 RW1 — BAHRAIN</Label>
+        </div>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+          {step >= 1 && <Label color={T.sub}>BUDGET <Mono size={10} color={T.text}>{budget} ML</Mono></Label>}
+          {step >= 1 && <Label color={T.sub}>TEAMS <Mono size={10} color={T.text}>{teams.filter(t => t.budget <= budget).length}</Mono></Label>}
+          {step >= 1 && <Label color={T.sub}>FLAGS <Mono size={10} color={teams.filter(t=>t.flagged).length > 0 ? T.accent : T.sub}>{teams.filter(t=>t.flagged).length}</Mono></Label>}
+        </div>
+      </div>
+
+      {/* Main */}
+      <div style={{ flex: 1, padding: '36px 40px' }}>
+        {/* Step indicator */}
+        <div style={{ marginBottom: 40 }}>
+          <StepBar step={step} />
+        </div>
+
+        {step === 0 && <StepUpload onNext={() => setStep(1)} />}
+        {step === 1 && (
+          <StepReview
+            teams={teams}
+            onBack={() => setStep(0)}
+            onNext={(b, updatedTeams) => {
+              setBudget(b);
+              setTeams(updatedTeams);
+              setStep(2);
+            }}
+          />
+        )}
+        {step === 2 && (
+          <StepAnalysis
+            teams={teams}
+            budget={budget}
+            onBack={() => setStep(1)}
+          />
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding: '12px 40px', borderTop: `1px solid ${T.border}`, background: '#080808' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <Label color={T.muted} style={{ fontSize: 8 }}>RHTER // F1 FANTASY ANALYSIS TOOL</Label>
+          <Label color={T.muted} style={{ fontSize: 8 }}>MODEL: KELLY CRITERION // 2026 SEASON</Label>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── TWEAKS ─────────────────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accentColor": "#e8401c",
+  "fontFamily": "Space Mono",
+  "borderStyle": "solid",
+  "showFooter": true
+}/*EDITMODE-END*/;
+
+const TweakPanel = () => {
+  const [tweaks, setTweaks] = useState(TWEAK_DEFAULTS);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    window.addEventListener('message', e => {
+      if (e.data?.type === '__activate_edit_mode') setVisible(true);
+      if (e.data?.type === '__deactivate_edit_mode') setVisible(false);
+    });
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+  }, []);
+
+  if (!visible) return null;
+  return (
+    <div style={{
+      position: 'fixed', bottom: 24, right: 24, background: '#0a0a0a',
+      border: `1px solid ${T.border}`, padding: 16, zIndex: 999, width: 220,
+    }}>
+      <Label style={{ display: 'block', marginBottom: 12 }}>Tweaks</Label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div>
+          <Label color={T.sub} style={{ display: 'block', marginBottom: 6 }}>ACCENT COLOR</Label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {['#e8401c', '#3b82f6', '#22c55e', '#f59e0b'].map(c => (
+              <button key={c} onClick={() => {
+                setTweaks(t => ({ ...t, accentColor: c }));
+                window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { accentColor: c } }, '*');
+              }} style={{
+                width: 24, height: 24, background: c, border: tweaks.accentColor === c ? `2px solid #fff` : '2px solid transparent',
+                cursor: 'pointer',
+              }} />
+            ))}
+          </div>
+        </div>
+        <div>
+          <Label color={T.sub} style={{ display: 'block', marginBottom: 6 }}>BORDER STYLE</Label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {['solid', 'dashed'].map(s => (
+              <Btn key={s} variant={tweaks.borderStyle === s ? 'fill' : 'outline'} size="sm"
+                onClick={() => { setTweaks(t => ({...t, borderStyle: s})); window.parent.postMessage({type:'__edit_mode_set_keys', edits:{borderStyle:s}}, '*'); }}>
+                {s}
+              </Btn>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+    <TweakPanel />
+  </React.StrictMode>
+);
+</script>
+</body>
+</html>
