@@ -608,12 +608,34 @@ video {
   display: contents;
 }
 
+.min-h-screen {
+  min-height: 100vh;
+}
+
 .transform {
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
 }
 
+.flex-col {
+  flex-direction: column;
+}
+
+.bg-bg {
+  --tw-bg-opacity: 1;
+  background-color: rgb(10 10 10 / var(--tw-bg-opacity, 1));
+}
+
+.font-mono {
+  font-family: "Space Mono", monospace;
+}
+
 .uppercase {
   text-transform: uppercase;
+}
+
+.text-text {
+  --tw-text-opacity: 1;
+  color: rgb(232 232 232 / var(--tw-text-opacity, 1));
 }
 
 .blur {

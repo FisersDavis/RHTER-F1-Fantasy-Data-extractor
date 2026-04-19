@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; connect-src 'self' https://generativelanguage.googleapis.com; worker-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline';">
-    <title>RHTER F1 Fantasy Data Extractor</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; connect-src 'self' https://generativelanguage.googleapis.com; worker-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
+    <title>RHTER F1 Fantasy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <header>
-        <h1>RHTER F1 Fantasy Data Extractor</h1>
-        <nav id="main-nav"></nav>
-    </header>
-    <main id="app"></main>
+<body class="bg-bg text-text font-mono min-h-screen flex flex-col">
+    <div id="wizard-root" class="flex flex-col min-h-screen"></div>
     <script type="module" src="app.js"></script>
 </body>
 </html>
