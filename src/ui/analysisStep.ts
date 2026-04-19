@@ -221,7 +221,7 @@ export function renderAnalysisStep(
     const ranked = computeRanked(violins!, state.budget, currentSortKey);
     if (!ranked.length) return;
 
-    const max = ranked[0].violin.percentiles.p95;
+    const max = Math.max(...violins!.map(v => v.percentiles.p95));
     const { rails, header: railHeader } = buildGuideRails(max);
 
     listWrap.appendChild(railHeader);

@@ -69,7 +69,7 @@ function makePair(label: string, value: string): HTMLElement {
 
 function getFlagCount(): number {
   try {
-    const raw = localStorage.getItem('reviewedDataset');
+    const raw = localStorage.getItem('reviewedViolins');
     if (!raw) return 0;
     const arr = JSON.parse(raw) as Array<{ flagged?: boolean }>;
     return arr.filter(v => v.flagged).length;

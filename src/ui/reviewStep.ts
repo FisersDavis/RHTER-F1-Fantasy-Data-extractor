@@ -112,6 +112,7 @@ export function renderReviewStep(
     const unresolved = violins.filter(v => v.flagged).length;
     flagCountLabel.textContent = `${unresolved} FLAG${unresolved !== 1 ? 'S' : ''}`;
     flagCountLabel.className = `font-mono text-[10px] uppercase tracking-[0.18em] ${unresolved > 0 ? 'text-accent' : 'text-dim'}`;
+    approveBtn.disabled = unresolved > 0;
     approveBtn.classList.toggle('opacity-30', unresolved > 0);
     approveBtn.classList.toggle('cursor-not-allowed', unresolved > 0);
     approveBtn.onclick = unresolved > 0 ? null : () => { saveReviewedDataset(violins); onApprove(); };

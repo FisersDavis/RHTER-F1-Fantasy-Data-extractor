@@ -82,14 +82,17 @@ function buildDropZone(onFile: (file: File) => void): HTMLElement {
 
   zone.addEventListener('dragover', (e) => {
     e.preventDefault();
-    zone.className = zone.className.replace('border-border', 'border-white bg-bg2');
+    zone.classList.remove('border-border');
+    zone.classList.add('border-white', 'bg-bg2');
   });
   zone.addEventListener('dragleave', () => {
-    zone.className = zone.className.replace('border-white bg-bg2', 'border-border');
+    zone.classList.remove('border-white', 'bg-bg2');
+    zone.classList.add('border-border');
   });
   zone.addEventListener('drop', (e) => {
     e.preventDefault();
-    zone.className = zone.className.replace('border-white bg-bg2', 'border-border');
+    zone.classList.remove('border-white', 'bg-bg2');
+    zone.classList.add('border-border');
     const file = e.dataTransfer?.files[0];
     if (file) onFile(file);
   });
@@ -227,7 +230,7 @@ export function renderUploadStep(container: HTMLElement, onComplete: () => void)
   function injectDemoData(): void {
     const demo = generateDemoViolins();
     localStorage.setItem('importedViolins', JSON.stringify(demo));
-    localStorage.setItem('reviewedDataset', JSON.stringify(demo));
+    localStorage.setItem('reviewedViolins', JSON.stringify(demo));
   }
 
   if (!hasKey) {
