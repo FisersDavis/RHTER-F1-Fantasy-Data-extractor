@@ -17,6 +17,9 @@ export type ProgressCallback = (p: PipelineProgress) => void;
 
 const INCREMENTAL_KEY = 'pipeline_incremental';
 
+// Set to a small number during UI testing; remove (or set to Infinity) for full runs.
+const TEST_CROP_LIMIT = 1;
+
 /**
  * Runs the full pipeline (stages 0–4) on a screenshot file.
  * Saves each result to localStorage incrementally.
@@ -33,16 +36,18 @@ export async function runPipeline(
   // Stage 0: crop
   onProgress({ completed: 0, total: 72, currentLabel: 'Cropping screenshot…' });
   const { raw } = await cropScreenshot(file);
+  (window as unknown as Record<string, unknown>).__lastCrops = { raw };
 
   const results: ViolinCrop[] = [];
   localStorage.setItem(INCREMENTAL_KEY, JSON.stringify([]));
 
   let completed = 0;
   if (!raw.length || !raw[0].length) throw new Error('No crops produced from screenshot');
-  const total = raw.length * raw[0].length;
+  const total = Math.min(raw.length * raw[0].length, TEST_CROP_LIMIT);
 
-  for (let row = 0; row < raw.length; row++) {
+  outer: for (let row = 0; row < raw.length; row++) {
     for (let col = 0; col < raw[row].length; col++) {
+      if (completed >= TEST_CROP_LIMIT) break outer;
       onProgress({
         completed,
         total,
@@ -66,6 +71,16 @@ export async function runPipeline(
         rawCtx.drawImage(rawBitmap, 0, 0);
         rawBitmap.close();
         const { cn1, cn2 } = extractConstructors(rawCanvas);
+
+        // DEBUG: download preprocessed crop to inspect before sending to Gemini
+        if ((window as any).__debugPreprocess) {
+          const debugUrl = URL.createObjectURL(preprocessedBlob);
+          const a = document.createElement('a');
+          a.href = debugUrl;
+          a.download = `crop_debug_r${row}_c${col}.png`;
+          a.click();
+          URL.revokeObjectURL(debugUrl);
+        }
 
         // Stage 2: extract numbers
         const { extraction, needsReview } = await extractCrop(preprocessedBlob, apiKey);

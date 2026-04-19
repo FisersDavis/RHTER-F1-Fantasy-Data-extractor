@@ -4,28 +4,141 @@ export interface CropBlobs {
   raw: Blob[][];   // [row][col]
 }
 
-// Placeholder grid boundaries for 2000×1124 reference screenshot.
-// Calibrate these against a real RHTER screenshot in Task 11.
-const ROW_Y: [number, number][] = [
-  [50,  373],   // row 0: y_start, y_end
-  [373, 707],   // row 1
-  [707, 1042],  // row 2
+// ---------------------------------------------------------------------------
+// Reference constants (calibrated from 1560×877 RHTER reference screenshot)
+// ---------------------------------------------------------------------------
+const REF_W = 1560;
+const REF_H = 877;
+const REF_ROW_BOUNDS: [number, number][] = [
+  [80,  333],
+  [343, 596],
+  [606, 860],
 ];
+const REF_CONTENT_X_START = 28;
+const REF_CONTENT_X_END   = 1340;
+const REF_GAP_MIN = 8;
+const REF_GAP_MAX = 20;
+const BACKGROUND_RGB: [number, number, number] = [52, 55, 61];
+const NUM_COLS = 24;
 
-const COL_X: [number, number][] = (() => {
-  // 24 equally-spaced columns across x=10..1990
-  const cols: [number, number][] = [];
-  const xStart = 10, xEnd = 1990;
-  const colW = (xEnd - xStart) / GRID_COLS;
-  for (let c = 0; c < GRID_COLS; c++) {
-    cols.push([Math.round(xStart + c * colW), Math.round(xStart + (c + 1) * colW)]);
+// ---------------------------------------------------------------------------
+// Gap detection
+// ---------------------------------------------------------------------------
+
+function boxFilter(arr: number[], size: number): number[] {
+  const half = Math.floor(size / 2);
+  const out = new Array<number>(arr.length);
+  for (let i = 0; i < arr.length; i++) {
+    let sum = 0, count = 0;
+    for (let j = Math.max(0, i - half); j <= Math.min(arr.length - 1, i + half); j++) {
+      sum += arr[j];
+      count++;
+    }
+    out[i] = sum / count;
   }
-  return cols;
-})();
+  return out;
+}
+
+function percentile25(arr: number[]): number {
+  const sorted = [...arr].sort((a, b) => a - b);
+  const idx = Math.floor(sorted.length * 0.25);
+  return sorted[idx];
+}
+
+/**
+ * Detects 25 column boundaries (for 24 columns) by scanning dark vertical
+ * gaps in row 0 of the image. Throws if exactly 23 gaps are not found.
+ */
+function detectColumnBoundaries(
+  ctx: CanvasRenderingContext2D,
+  imgWidth: number,
+  imgHeight: number,
+): number[] {
+  const scaleX = imgWidth  / REF_W;
+  const scaleY = imgHeight / REF_H;
+
+  const yTop    = Math.round(REF_ROW_BOUNDS[0][0] * scaleY);
+  const yBottom = Math.round(REF_ROW_BOUNDS[0][1] * scaleY);
+  const xStart  = Math.round(REF_CONTENT_X_START * scaleX);
+  const xEnd    = Math.round(REF_CONTENT_X_END   * scaleX);
+  const gapMin  = REF_GAP_MIN  * scaleX;
+  const gapMax  = REF_GAP_MAX  * scaleX;
+  const smoothSize = Math.max(3, Math.round(3 * scaleX));
+
+  if (imgWidth < 1500 || imgHeight < 800) {
+    console.warn(`Gap detection: image ${imgWidth}×${imgHeight} is smaller than expected (~1560×877). Crops may be misaligned.`);
+  }
+
+  const stripWidth  = xEnd - xStart;
+  const stripHeight = yBottom - yTop;
+  const imageData   = ctx.getImageData(xStart, yTop, stripWidth, stripHeight);
+  const data        = imageData.data;
+
+  // Compute per-column mean Euclidean distance from BACKGROUND_RGB
+  const [br, bg, bb] = BACKGROUND_RGB;
+  const colScores = new Array<number>(stripWidth).fill(0);
+
+  for (let col = 0; col < stripWidth; col++) {
+    let sum = 0;
+    for (let row = 0; row < stripHeight; row++) {
+      const idx = (row * stripWidth + col) * 4;
+      const dr = data[idx]     - br;
+      const dg = data[idx + 1] - bg;
+      const db = data[idx + 2] - bb;
+      sum += Math.sqrt(dr * dr + dg * dg + db * db);
+    }
+    colScores[col] = sum / stripHeight;
+  }
+
+  const smoothed  = boxFilter(colScores, smoothSize);
+  const threshold = percentile25(smoothed);
+  const isDark    = smoothed.map(v => v < threshold);
+
+  // Find contiguous dark runs (gaps)
+  const gaps: { mid: number; width: number }[] = [];
+  let inGap = false;
+  let gapStart = 0;
+
+  for (let x = 0; x <= isDark.length; x++) {
+    const dark = x < isDark.length && isDark[x];
+    if (dark && !inGap) {
+      inGap = true;
+      gapStart = x;
+    } else if (!dark && inGap) {
+      inGap = false;
+      const gapEnd = x;
+      const width  = gapEnd - gapStart;
+      const mid    = Math.floor((gapStart + gapEnd) / 2) + xStart;
+      gaps.push({ mid, width });
+    }
+  }
+
+  const realGaps = gaps.filter(g => g.width >= gapMin && g.width <= gapMax);
+
+  if (realGaps.length !== 23) {
+    throw new Error(
+      `Gap detection found ${realGaps.length} gaps, expected 23. Screenshot may be cropped or layout changed.`
+    );
+  }
+
+  const avgColWidth = (realGaps[22].mid - realGaps[0].mid) / 22;
+  const boundaries: number[] = [
+    Math.round(realGaps[0].mid - avgColWidth),
+    ...realGaps.map(g => g.mid),
+    Math.round(realGaps[22].mid + avgColWidth),
+  ];
+
+  return boundaries;
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
 
 async function cropCell(
   source: HTMLCanvasElement,
   x: number, y: number, w: number, h: number,
+  row: number, col: number,
 ): Promise<Blob> {
   const canvas = document.createElement('canvas');
   canvas.width  = w;
@@ -36,14 +149,11 @@ async function cropCell(
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (blob) resolve(blob);
-      else reject(new Error('toBlob returned null'));
+      else reject(new Error(`toBlob returned null for row ${row} col ${col}`));
     }, 'image/png');
   });
 }
 
-/**
- * Loads an image File into an HTMLCanvasElement.
- */
 async function fileToCanvas(file: File): Promise<HTMLCanvasElement> {
   const bitmap = await createImageBitmap(file);
   const canvas = document.createElement('canvas');
@@ -56,19 +166,38 @@ async function fileToCanvas(file: File): Promise<HTMLCanvasElement> {
   return canvas;
 }
 
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
 /**
  * Crops a RHTER screenshot into a GRID_ROWS × GRID_COLS grid of Blob objects.
+ * Column boundaries are detected dynamically via gap detection.
  */
 export async function cropScreenshot(file: File): Promise<CropBlobs> {
   const source = await fileToCanvas(file);
+  const ctx    = source.getContext('2d');
+  if (!ctx) throw new Error('Could not get 2D context');
+
+  const scaleY       = source.height / REF_H;
+  const boundaries   = detectColumnBoundaries(ctx, source.width, source.height);
+  const rowBounds    = REF_ROW_BOUNDS.map(([y0, y1]): [number, number] => [
+    Math.round(y0 * scaleY),
+    Math.round(y1 * scaleY),
+  ]);
+
+  if (GRID_ROWS !== 3 || GRID_COLS !== NUM_COLS) {
+    throw new Error(`Config mismatch: expected 3×24 grid, got ${GRID_ROWS}×${GRID_COLS}`);
+  }
 
   const raw = await Promise.all(
     Array.from({ length: GRID_ROWS }, (_, row) => {
-      const [yStart, yEnd] = ROW_Y[row];
+      const [yTop, yBottom] = rowBounds[row];
       return Promise.all(
         Array.from({ length: GRID_COLS }, (_, col) => {
-          const [xStart, xEnd] = COL_X[col];
-          return cropCell(source, xStart, yStart, xEnd - xStart, yEnd - yStart);
+          const xLeft  = boundaries[col];
+          const xRight = boundaries[col + 1];
+          return cropCell(source, xLeft, yTop, xRight - xLeft, yBottom - yTop, row, col);
         }),
       );
     }),
@@ -78,8 +207,8 @@ export async function cropScreenshot(file: File): Promise<CropBlobs> {
 }
 
 /**
- * Draws a grid overlay on the preview canvas for visual confirmation.
- * Returns the canvas element (append it to the DOM where needed).
+ * Draws a grid overlay on the preview canvas using the same detected boundaries,
+ * so the user sees exactly what will be cropped.
  */
 export function drawGridOverlay(
   file: File,
@@ -101,20 +230,34 @@ export function drawGridOverlay(
     ctx.drawImage(bitmap, 0, 0);
     bitmap.close();
 
-    ctx.strokeStyle = 'rgba(98,238,183,0.8)';
-    ctx.lineWidth = 1;
+    let boundaries: number[];
+    try {
+      boundaries = detectColumnBoundaries(ctx, canvas.width, canvas.height);
+    } catch (err) {
+      if (onError) onError(err as Error); else console.error(err);
+      return;
+    }
 
-    // Draw row boundaries (top edge of first row + bottom edge of each row)
-    const rowBoundaries = [ROW_Y[0][0], ...ROW_Y.map(([, yEnd]) => yEnd)];
-    for (const y of rowBoundaries) {
+    const scaleY   = canvas.height / REF_H;
+    const rowBounds = REF_ROW_BOUNDS.map(([y0, y1]) => [
+      Math.round(y0 * scaleY),
+      Math.round(y1 * scaleY),
+    ]);
+
+    ctx.strokeStyle = 'rgba(98,238,183,0.8)';
+    ctx.lineWidth   = 1;
+
+    // Row lines
+    const rowYs = [rowBounds[0][0], ...rowBounds.map(([, y1]) => y1)];
+    for (const y of rowYs) {
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(canvas.width, y);
       ctx.stroke();
     }
-    // Draw column boundaries (left edge of first column + right edge of each column)
-    const colBoundaries = [COL_X[0][0], ...COL_X.map(([, xEnd]) => xEnd)];
-    for (const x of colBoundaries) {
+
+    // Column lines from detected boundaries
+    for (const x of boundaries) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, canvas.height);

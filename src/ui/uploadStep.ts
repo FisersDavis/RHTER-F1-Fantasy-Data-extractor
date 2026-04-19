@@ -100,13 +100,13 @@ function buildDropZone(onFile: (file: File) => void): HTMLElement {
   return zone;
 }
 
-function buildProgressSection(phaseIndex: number, percent: number): HTMLElement {
+function buildProgressSection(phaseIndex: number, percent: number, label?: string): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'min-h-[360px] bg-bg1 border border-border flex flex-col justify-center px-[40px] gap-4';
 
   const phaseLabel = document.createElement('span');
   phaseLabel.className = 'font-mono text-[9px] uppercase tracking-[0.18em] text-dim';
-  phaseLabel.textContent = PHASE_LABELS[phaseIndex] ?? 'PROCESSING';
+  phaseLabel.textContent = label ?? PHASE_LABELS[phaseIndex] ?? 'PROCESSING';
   wrap.appendChild(phaseLabel);
 
   const track = document.createElement('div');
@@ -211,7 +211,7 @@ export function renderUploadStep(container: HTMLElement, onComplete: () => void)
       phaseIndex = Math.min(3, Math.floor((p.completed / p.total) * 4));
 
       uploadAreaEl!.innerHTML = '';
-      const updated = buildProgressSection(phaseIndex, percent);
+      const updated = buildProgressSection(phaseIndex, percent, p.currentLabel.toUpperCase());
       uploadAreaEl!.appendChild(updated);
 
       if (percent >= 100) {

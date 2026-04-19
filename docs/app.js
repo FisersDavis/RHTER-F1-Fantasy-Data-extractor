@@ -32,24 +32,101 @@
   var GRID_ROWS = 3;
 
   // src/cropper.ts
-  var ROW_Y = [
-    [50, 373],
-    // row 0: y_start, y_end
-    [373, 707],
-    // row 1
-    [707, 1042]
-    // row 2
+  var REF_W = 1560;
+  var REF_H = 877;
+  var REF_ROW_BOUNDS = [
+    [80, 333],
+    [343, 596],
+    [606, 860]
   ];
-  var COL_X = (() => {
-    const cols = [];
-    const xStart = 10, xEnd = 1990;
-    const colW = (xEnd - xStart) / GRID_COLS;
-    for (let c = 0; c < GRID_COLS; c++) {
-      cols.push([Math.round(xStart + c * colW), Math.round(xStart + (c + 1) * colW)]);
+  var REF_CONTENT_X_START = 28;
+  var REF_CONTENT_X_END = 1340;
+  var REF_GAP_MIN = 8;
+  var REF_GAP_MAX = 20;
+  var BACKGROUND_RGB = [52, 55, 61];
+  var NUM_COLS = 24;
+  function boxFilter(arr, size) {
+    const half = Math.floor(size / 2);
+    const out = new Array(arr.length);
+    for (let i = 0; i < arr.length; i++) {
+      let sum = 0, count = 0;
+      for (let j = Math.max(0, i - half); j <= Math.min(arr.length - 1, i + half); j++) {
+        sum += arr[j];
+        count++;
+      }
+      out[i] = sum / count;
     }
-    return cols;
-  })();
-  async function cropCell(source, x, y, w, h) {
+    return out;
+  }
+  function percentile25(arr) {
+    const sorted = [...arr].sort((a, b) => a - b);
+    const idx = Math.floor(sorted.length * 0.25);
+    return sorted[idx];
+  }
+  function detectColumnBoundaries(ctx, imgWidth, imgHeight) {
+    const scaleX = imgWidth / REF_W;
+    const scaleY = imgHeight / REF_H;
+    const yTop = Math.round(REF_ROW_BOUNDS[0][0] * scaleY);
+    const yBottom = Math.round(REF_ROW_BOUNDS[0][1] * scaleY);
+    const xStart = Math.round(REF_CONTENT_X_START * scaleX);
+    const xEnd = Math.round(REF_CONTENT_X_END * scaleX);
+    const gapMin = REF_GAP_MIN * scaleX;
+    const gapMax = REF_GAP_MAX * scaleX;
+    const smoothSize = Math.max(3, Math.round(3 * scaleX));
+    if (imgWidth < 1500 || imgHeight < 800) {
+      console.warn(`Gap detection: image ${imgWidth}\xD7${imgHeight} is smaller than expected (~1560\xD7877). Crops may be misaligned.`);
+    }
+    const stripWidth = xEnd - xStart;
+    const stripHeight = yBottom - yTop;
+    const imageData = ctx.getImageData(xStart, yTop, stripWidth, stripHeight);
+    const data = imageData.data;
+    const [br, bg, bb] = BACKGROUND_RGB;
+    const colScores = new Array(stripWidth).fill(0);
+    for (let col = 0; col < stripWidth; col++) {
+      let sum = 0;
+      for (let row = 0; row < stripHeight; row++) {
+        const idx = (row * stripWidth + col) * 4;
+        const dr = data[idx] - br;
+        const dg = data[idx + 1] - bg;
+        const db = data[idx + 2] - bb;
+        sum += Math.sqrt(dr * dr + dg * dg + db * db);
+      }
+      colScores[col] = sum / stripHeight;
+    }
+    const smoothed = boxFilter(colScores, smoothSize);
+    const threshold = percentile25(smoothed);
+    const isDark = smoothed.map((v) => v < threshold);
+    const gaps = [];
+    let inGap = false;
+    let gapStart = 0;
+    for (let x = 0; x <= isDark.length; x++) {
+      const dark = x < isDark.length && isDark[x];
+      if (dark && !inGap) {
+        inGap = true;
+        gapStart = x;
+      } else if (!dark && inGap) {
+        inGap = false;
+        const gapEnd = x;
+        const width = gapEnd - gapStart;
+        const mid = Math.floor((gapStart + gapEnd) / 2) + xStart;
+        gaps.push({ mid, width });
+      }
+    }
+    const realGaps = gaps.filter((g) => g.width >= gapMin && g.width <= gapMax);
+    if (realGaps.length !== 23) {
+      throw new Error(
+        `Gap detection found ${realGaps.length} gaps, expected 23. Screenshot may be cropped or layout changed.`
+      );
+    }
+    const avgColWidth = (realGaps[22].mid - realGaps[0].mid) / 22;
+    const boundaries = [
+      Math.round(realGaps[0].mid - avgColWidth),
+      ...realGaps.map((g) => g.mid),
+      Math.round(realGaps[22].mid + avgColWidth)
+    ];
+    return boundaries;
+  }
+  async function cropCell(source, x, y, w, h, row, col) {
     const canvas = document.createElement("canvas");
     canvas.width = w;
     canvas.height = h;
@@ -62,7 +139,7 @@
         if (blob)
           resolve(blob);
         else
-          reject(new Error("toBlob returned null"));
+          reject(new Error(`toBlob returned null for row ${row} col ${col}`));
       }, "image/png");
     });
   }
@@ -80,13 +157,26 @@
   }
   async function cropScreenshot(file) {
     const source = await fileToCanvas(file);
+    const ctx = source.getContext("2d");
+    if (!ctx)
+      throw new Error("Could not get 2D context");
+    const scaleY = source.height / REF_H;
+    const boundaries = detectColumnBoundaries(ctx, source.width, source.height);
+    const rowBounds = REF_ROW_BOUNDS.map(([y0, y1]) => [
+      Math.round(y0 * scaleY),
+      Math.round(y1 * scaleY)
+    ]);
+    if (GRID_ROWS !== 3 || GRID_COLS !== NUM_COLS) {
+      throw new Error(`Config mismatch: expected 3\xD724 grid, got ${GRID_ROWS}\xD7${GRID_COLS}`);
+    }
     const raw = await Promise.all(
       Array.from({ length: GRID_ROWS }, (_, row) => {
-        const [yStart, yEnd] = ROW_Y[row];
+        const [yTop, yBottom] = rowBounds[row];
         return Promise.all(
           Array.from({ length: GRID_COLS }, (_2, col) => {
-            const [xStart, xEnd] = COL_X[col];
-            return cropCell(source, xStart, yStart, xEnd - xStart, yEnd - yStart);
+            const xLeft = boundaries[col];
+            const xRight = boundaries[col + 1];
+            return cropCell(source, xLeft, yTop, xRight - xLeft, yBottom - yTop, row, col);
           })
         );
       })
@@ -147,78 +237,116 @@
   }
 
   // src/extractor.ts
-  var GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent";
-  var PROMPT_PASS1 = `You are extracting structured data from an F1 fantasy violin plot image.
-The image shows one violin plot with:
-- A header row at the top containing: budget required (M), avg_xpts, avg_xpts_dollar_impact, avg_budget_uplift
-- A y-axis with percentile scores
-- Five driver abbreviations at the bottom (3 uppercase letters each)
-- Exactly one driver has a multiplier (2X or 3X)
+  var GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent";
+  var EXPECTED_LINES = 14;
+  var PROMPT = `Read this violin plot crop top-to-bottom. Return exactly 14 lines of plain text, nothing else.
 
-Extract and return ONLY a JSON object with these exact fields (no markdown, no prose):
-{
-  "p05": number,
-  "p25": number,
-  "p50": number,
-  "p75": number,
-  "p95": number,
-  "avg_xpts": number,
-  "avg_xpts_dollar_impact": number,
-  "budget_required": number,
-  "avg_budget_uplift": number or null,
-  "driver_1": "XXX",
-  "driver_2": "XXX",
-  "driver_3": "XXX",
-  "driver_4": "XXX",
-  "driver_5": "XXX",
-  "driver_1_2x": boolean,
-  "driver_2_2x": boolean,
-  "driver_3_2x": boolean,
-  "driver_4_2x": boolean,
-  "driver_5_2x": boolean
-}
-Read labels top-to-bottom, left-to-right. Do not guess \u2014 only report what you can clearly see.`;
-  var PROMPT_PASS2 = `You are verifying an extraction from an F1 fantasy violin plot image.
-Re-read the image carefully. Return ONLY a JSON object with the same fields as before:
-{
-  "p05": number, "p25": number, "p50": number, "p75": number, "p95": number,
-  "avg_xpts": number, "avg_xpts_dollar_impact": number, "budget_required": number,
-  "avg_budget_uplift": number or null,
-  "driver_1": "XXX", "driver_2": "XXX", "driver_3": "XXX", "driver_4": "XXX", "driver_5": "XXX",
-  "driver_1_2x": boolean, "driver_2_2x": boolean, "driver_3_2x": boolean,
-  "driver_4_2x": boolean, "driver_5_2x": boolean
-}`;
+Lines 1-4: the four header numbers at the top, reading top-to-bottom:
+1. Budget Required (e.g. 103.2)
+2. Avg. xPts (e.g. 245.1)
+3. Avg. xPts + ($ impact) (e.g. 248.3)
+4. Avg. Budget Uplift (e.g. 2.1)
+
+Lines 5-9: the five percentile values shown on/beside the violin body, top-to-bottom:
+5. 95th percentile
+6. 75th percentile
+7. 50th percentile (median)
+8. 25th percentile
+9. 5th percentile
+
+Lines 10-14: the five driver abbreviations at the bottom, top-to-bottom.
+Each is a 3-letter uppercase code (e.g. NOR, PIA, VER).
+Exactly one driver has a (2X) multiplier marker \u2014 append " 2X" after that driver's code.
+
+Example output:
+103.2
+245.1
+248.3
+2.1
+310.5
+270.2
+245.0
+220.1
+180.3
+NOR 2X
+PIA
+VER
+HAM
+LEC`;
   function parseGeminiResponse(raw) {
-    const cleaned = raw.replace(/^```(?:json)?\n?/i, "").replace(/\n?```$/i, "").trim();
-    let obj;
-    try {
-      obj = JSON.parse(cleaned);
-    } catch {
-      throw new Error(`JSON parse failed. Raw response: ${raw.slice(0, 200)}`);
+    const lines = raw.trim().split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+    const flags = [];
+    if (lines.length !== EXPECTED_LINES) {
+      flags.push(`line_count_mismatch (got ${lines.length}, expected ${EXPECTED_LINES})`);
+    }
+    const headerKeys = ["budget_required", "avg_xpts", "avg_xpts_dollar_impact", "avg_budget_uplift"];
+    const headerValues = {};
+    for (let i = 0; i < 4; i++) {
+      const key = headerKeys[i];
+      if (i < lines.length) {
+        const n = parseFloat(lines[i]);
+        if (isNaN(n)) {
+          headerValues[key] = null;
+          flags.push(`parse_error: line ${i + 1} not a number: ${JSON.stringify(lines[i])}`);
+        } else {
+          headerValues[key] = n;
+        }
+      } else {
+        headerValues[key] = null;
+      }
+    }
+    const pctKeys = ["p95", "p75", "p50", "p25", "p05"];
+    const pctValues = {};
+    for (let j = 0; j < 5; j++) {
+      const key = pctKeys[j];
+      const i = 4 + j;
+      if (i < lines.length) {
+        const n = parseFloat(lines[i]);
+        if (isNaN(n)) {
+          pctValues[key] = null;
+          flags.push(`parse_error: line ${i + 1} not a number: ${JSON.stringify(lines[i])}`);
+        } else {
+          pctValues[key] = n;
+        }
+      } else {
+        pctValues[key] = null;
+      }
     }
     const drivers = [];
-    for (let i = 1; i <= 5; i++) {
-      drivers.push({
-        name: String(obj[`driver_${i}`] ?? "???").toUpperCase().slice(0, 3),
-        multiplier: obj[`driver_${i}_2x`] ? "2X" : null
-      });
+    for (let j = 0; j < 5; j++) {
+      const i = 9 + j;
+      if (i < lines.length) {
+        const raw_line = lines[i].toUpperCase();
+        if (raw_line.endsWith(" 2X")) {
+          drivers.push({ name: raw_line.slice(0, -3).trim(), multiplier: "2X" });
+        } else if (raw_line.endsWith("2X")) {
+          drivers.push({ name: raw_line.slice(0, -2).trim(), multiplier: "2X" });
+        } else {
+          drivers.push({ name: raw_line, multiplier: null });
+        }
+      } else {
+        drivers.push({ name: "???", multiplier: null });
+      }
     }
     return {
-      header: {
-        budget_required: Number(obj.budget_required),
-        avg_xpts: Number(obj.avg_xpts),
-        avg_xpts_dollar_impact: Number(obj.avg_xpts_dollar_impact),
-        avg_budget_uplift: obj.avg_budget_uplift != null ? Number(obj.avg_budget_uplift) : null
+      extraction: {
+        header: {
+          budget_required: headerValues.budget_required,
+          avg_xpts: headerValues.avg_xpts,
+          avg_xpts_dollar_impact: headerValues.avg_xpts_dollar_impact,
+          avg_budget_uplift: headerValues.avg_budget_uplift
+        },
+        percentiles: {
+          p95: pctValues.p95,
+          p75: pctValues.p75,
+          p50: pctValues.p50,
+          p25: pctValues.p25,
+          p05: pctValues.p05
+        },
+        drivers,
+        raw_response: raw
       },
-      percentiles: {
-        p05: Number(obj.p05),
-        p25: Number(obj.p25),
-        p50: Number(obj.p50),
-        p75: Number(obj.p75),
-        p95: Number(obj.p95)
-      },
-      drivers,
-      raw_response: raw
+      flags
     };
   }
   async function callGemini(blob, apiKey, prompt) {
@@ -241,7 +369,7 @@ Re-read the image carefully. Return ONLY a JSON object with the same fields as b
       generationConfig: { temperature: 0, maxOutputTokens: 512 }
     };
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3e4);
+    const timeoutId = setTimeout(() => controller.abort(), 9e4);
     let response;
     try {
       response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
@@ -252,7 +380,7 @@ Re-read the image carefully. Return ONLY a JSON object with the same fields as b
       });
     } catch (err) {
       if (err.name === "AbortError") {
-        throw new Error("Gemini API request timed out after 30s");
+        throw new Error("Gemini API request timed out after 90s");
       }
       throw err;
     } finally {
@@ -268,18 +396,6 @@ Re-read the image carefully. Return ONLY a JSON object with the same fields as b
       throw new Error("Gemini returned no usable candidate (safety filter or empty response)");
     }
     return candidate.content.parts[0].text;
-  }
-  function extractionsAgree(a, b) {
-    const pa = a.percentiles, pb = b.percentiles;
-    if (pa.p50 !== pb.p50)
-      return false;
-    if (pa.p05 !== pb.p05 || pa.p95 !== pb.p95)
-      return false;
-    if (a.header.budget_required !== b.header.budget_required)
-      return false;
-    const da = a.drivers.map((d) => d.name + (d.multiplier ?? "")).join("");
-    const db = b.drivers.map((d) => d.name + (d.multiplier ?? "")).join("");
-    return da === db;
   }
   var RateLimiter = class {
     constructor(limit) {
@@ -304,16 +420,14 @@ Re-read the image carefully. Return ONLY a JSON object with the same fields as b
       }
     }
   };
-  var rateLimiter = new RateLimiter(7);
+  var rateLimiter = new RateLimiter(14);
   async function extractCrop(blob, apiKey) {
     await rateLimiter.acquire();
-    const raw1 = await callGemini(blob, apiKey, PROMPT_PASS1);
-    const ext1 = parseGeminiResponse(raw1);
-    const raw2 = await callGemini(blob, apiKey, PROMPT_PASS2);
-    const ext2 = parseGeminiResponse(raw2);
+    const raw = await callGemini(blob, apiKey, PROMPT);
+    const { extraction, flags } = parseGeminiResponse(raw);
     return {
-      extraction: ext1,
-      needsReview: !extractionsAgree(ext1, ext2)
+      extraction,
+      needsReview: flags.length > 0
     };
   }
 
@@ -523,69 +637,82 @@ Re-read the image carefully. Return ONLY a JSON object with the same fields as b
 
   // src/pipelineOrchestrator.ts
   var INCREMENTAL_KEY = "pipeline_incremental";
+  var TEST_CROP_LIMIT = 1;
   async function runPipeline(file, onProgress) {
     const apiKey = getApiKey();
     if (!apiKey)
       throw new Error("No Gemini API key set. Go to Settings first.");
     onProgress({ completed: 0, total: 72, currentLabel: "Cropping screenshot\u2026" });
     const { raw } = await cropScreenshot(file);
+    window.__lastCrops = { raw };
     const results = [];
     localStorage.setItem(INCREMENTAL_KEY, JSON.stringify([]));
     let completed = 0;
     if (!raw.length || !raw[0].length)
       throw new Error("No crops produced from screenshot");
-    const total = raw.length * raw[0].length;
-    for (let row = 0; row < raw.length; row++) {
-      for (let col = 0; col < raw[row].length; col++) {
-        onProgress({
-          completed,
-          total,
-          currentLabel: `Extracting crop ${completed + 1} of ${total} (row ${row}, col ${col})\u2026`
-        });
-        try {
-          const rawBlob = raw[row][col];
-          const preprocessedCanvas = await preprocessCrop(rawBlob);
-          const preprocessedBlob = await canvasToBlob(preprocessedCanvas);
-          const rawCanvas = document.createElement("canvas");
-          const rawBitmap = await createImageBitmap(rawBlob);
-          rawCanvas.width = rawBitmap.width;
-          rawCanvas.height = rawBitmap.height;
-          const rawCtx = rawCanvas.getContext("2d");
-          if (!rawCtx)
-            throw new Error("Could not get context for raw canvas");
-          rawCtx.drawImage(rawBitmap, 0, 0);
-          rawBitmap.close();
-          const { cn1, cn2 } = extractConstructors(rawCanvas);
-          const { extraction, needsReview } = await extractCrop(preprocessedBlob, apiKey);
-          const crop = {
-            row,
-            col,
-            header: extraction.header,
-            percentiles: extraction.percentiles,
-            drivers: extraction.drivers,
-            constructors: {
-              cn1: { color_rgb: null, team: cn1 },
-              cn2: { color_rgb: null, team: cn2 }
-            },
-            confidence: needsReview ? "low" : "high",
-            flagged: needsReview,
-            flag_reasons: needsReview ? ["two-pass disagreement"] : [],
-            raw_response: extraction.raw_response
-          };
-          validateCrop(crop);
-          if (needsReview && !crop.flag_reasons.includes("two-pass disagreement")) {
-            crop.flag_reasons.push("two-pass disagreement");
-            crop.flagged = true;
+    const total = Math.min(raw.length * raw[0].length, TEST_CROP_LIMIT);
+    outer:
+      for (let row = 0; row < raw.length; row++) {
+        for (let col = 0; col < raw[row].length; col++) {
+          if (completed >= TEST_CROP_LIMIT)
+            break outer;
+          onProgress({
+            completed,
+            total,
+            currentLabel: `Extracting crop ${completed + 1} of ${total} (row ${row}, col ${col})\u2026`
+          });
+          try {
+            const rawBlob = raw[row][col];
+            const preprocessedCanvas = await preprocessCrop(rawBlob);
+            const preprocessedBlob = await canvasToBlob(preprocessedCanvas);
+            const rawCanvas = document.createElement("canvas");
+            const rawBitmap = await createImageBitmap(rawBlob);
+            rawCanvas.width = rawBitmap.width;
+            rawCanvas.height = rawBitmap.height;
+            const rawCtx = rawCanvas.getContext("2d");
+            if (!rawCtx)
+              throw new Error("Could not get context for raw canvas");
+            rawCtx.drawImage(rawBitmap, 0, 0);
+            rawBitmap.close();
+            const { cn1, cn2 } = extractConstructors(rawCanvas);
+            if (window.__debugPreprocess) {
+              const debugUrl = URL.createObjectURL(preprocessedBlob);
+              const a = document.createElement("a");
+              a.href = debugUrl;
+              a.download = `crop_debug_r${row}_c${col}.png`;
+              a.click();
+              URL.revokeObjectURL(debugUrl);
+            }
+            const { extraction, needsReview } = await extractCrop(preprocessedBlob, apiKey);
+            const crop = {
+              row,
+              col,
+              header: extraction.header,
+              percentiles: extraction.percentiles,
+              drivers: extraction.drivers,
+              constructors: {
+                cn1: { color_rgb: null, team: cn1 },
+                cn2: { color_rgb: null, team: cn2 }
+              },
+              confidence: needsReview ? "low" : "high",
+              flagged: needsReview,
+              flag_reasons: needsReview ? ["two-pass disagreement"] : [],
+              raw_response: extraction.raw_response
+            };
+            validateCrop(crop);
+            if (needsReview && !crop.flag_reasons.includes("two-pass disagreement")) {
+              crop.flag_reasons.push("two-pass disagreement");
+              crop.flagged = true;
+            }
+            results.push(crop);
+          } catch (err) {
+            console.error(`Crop [${row},${col}] failed:`, err);
           }
-          results.push(crop);
-        } catch (err) {
-          console.error(`Crop [${row},${col}] failed:`, err);
+          completed++;
+          localStorage.setItem(INCREMENTAL_KEY, JSON.stringify(results));
+          onProgress({ completed, total, currentLabel: `Extracting crop ${completed} of ${total}\u2026` });
         }
-        completed++;
-        localStorage.setItem(INCREMENTAL_KEY, JSON.stringify(results));
-        onProgress({ completed, total, currentLabel: `Extracting crop ${completed} of ${total}\u2026` });
       }
-    }
     importJSON(results);
     localStorage.removeItem(INCREMENTAL_KEY);
     return results;
@@ -675,12 +802,12 @@ Re-read the image carefully. Return ONLY a JSON object with the same fields as b
     });
     return zone;
   }
-  function buildProgressSection(phaseIndex, percent) {
+  function buildProgressSection(phaseIndex, percent, label) {
     const wrap = document.createElement("div");
     wrap.className = "min-h-[360px] bg-bg1 border border-border flex flex-col justify-center px-[40px] gap-4";
     const phaseLabel = document.createElement("span");
     phaseLabel.className = "font-mono text-[9px] uppercase tracking-[0.18em] text-dim";
-    phaseLabel.textContent = PHASE_LABELS[phaseIndex] ?? "PROCESSING";
+    phaseLabel.textContent = label ?? PHASE_LABELS[phaseIndex] ?? "PROCESSING";
     wrap.appendChild(phaseLabel);
     const track = document.createElement("div");
     track.className = "w-full h-[2px] bg-bg2";
@@ -769,7 +896,7 @@ Re-read the image carefully. Return ONLY a JSON object with the same fields as b
         percent = Math.round(p.completed / p.total * 100);
         phaseIndex = Math.min(3, Math.floor(p.completed / p.total * 4));
         uploadAreaEl.innerHTML = "";
-        const updated = buildProgressSection(phaseIndex, percent);
+        const updated = buildProgressSection(phaseIndex, percent, p.currentLabel.toUpperCase());
         uploadAreaEl.appendChild(updated);
         if (percent >= 100) {
           setTimeout(onComplete, 400);

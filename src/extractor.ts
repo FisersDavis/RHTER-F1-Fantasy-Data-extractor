@@ -13,84 +13,129 @@ interface GeminiResponse {
   }>;
 }
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent';
 
-const PROMPT_PASS1 = `You are extracting structured data from an F1 fantasy violin plot image.
-The image shows one violin plot with:
-- A header row at the top containing: budget required (M), avg_xpts, avg_xpts_dollar_impact, avg_budget_uplift
-- A y-axis with percentile scores
-- Five driver abbreviations at the bottom (3 uppercase letters each)
-- Exactly one driver has a multiplier (2X or 3X)
+const EXPECTED_LINES = 14;
 
-Extract and return ONLY a JSON object with these exact fields (no markdown, no prose):
-{
-  "p05": number,
-  "p25": number,
-  "p50": number,
-  "p75": number,
-  "p95": number,
-  "avg_xpts": number,
-  "avg_xpts_dollar_impact": number,
-  "budget_required": number,
-  "avg_budget_uplift": number or null,
-  "driver_1": "XXX",
-  "driver_2": "XXX",
-  "driver_3": "XXX",
-  "driver_4": "XXX",
-  "driver_5": "XXX",
-  "driver_1_2x": boolean,
-  "driver_2_2x": boolean,
-  "driver_3_2x": boolean,
-  "driver_4_2x": boolean,
-  "driver_5_2x": boolean
+const PROMPT = `Read this violin plot crop top-to-bottom. Return exactly 14 lines of plain text, nothing else.
+
+Lines 1-4: the four header numbers at the top, reading top-to-bottom:
+1. Budget Required (e.g. 103.2)
+2. Avg. xPts (e.g. 245.1)
+3. Avg. xPts + ($ impact) (e.g. 248.3)
+4. Avg. Budget Uplift (e.g. 2.1)
+
+Lines 5-9: the five percentile values shown on/beside the violin body, top-to-bottom:
+5. 95th percentile
+6. 75th percentile
+7. 50th percentile (median)
+8. 25th percentile
+9. 5th percentile
+
+Lines 10-14: the five driver abbreviations at the bottom, top-to-bottom.
+Each is a 3-letter uppercase code (e.g. NOR, PIA, VER).
+Exactly one driver has a (2X) multiplier marker — append " 2X" after that driver's code.
+
+Example output:
+103.2
+245.1
+248.3
+2.1
+310.5
+270.2
+245.0
+220.1
+180.3
+NOR 2X
+PIA
+VER
+HAM
+LEC`;
+
+interface ParseResult {
+  extraction: RawExtraction;
+  flags: string[];
 }
-Read labels top-to-bottom, left-to-right. Do not guess — only report what you can clearly see.`;
 
-const PROMPT_PASS2 = `You are verifying an extraction from an F1 fantasy violin plot image.
-Re-read the image carefully. Return ONLY a JSON object with the same fields as before:
-{
-  "p05": number, "p25": number, "p50": number, "p75": number, "p95": number,
-  "avg_xpts": number, "avg_xpts_dollar_impact": number, "budget_required": number,
-  "avg_budget_uplift": number or null,
-  "driver_1": "XXX", "driver_2": "XXX", "driver_3": "XXX", "driver_4": "XXX", "driver_5": "XXX",
-  "driver_1_2x": boolean, "driver_2_2x": boolean, "driver_3_2x": boolean,
-  "driver_4_2x": boolean, "driver_5_2x": boolean
-}`;
+function parseGeminiResponse(raw: string): ParseResult {
+  const lines = raw.trim().split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const flags: string[] = [];
 
-function parseGeminiResponse(raw: string): RawExtraction {
-  // Strip markdown fences if present
-  const cleaned = raw.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
-  let obj: Record<string, unknown>;
-  try {
-    obj = JSON.parse(cleaned);
-  } catch {
-    throw new Error(`JSON parse failed. Raw response: ${raw.slice(0, 200)}`);
+  if (lines.length !== EXPECTED_LINES) {
+    flags.push(`line_count_mismatch (got ${lines.length}, expected ${EXPECTED_LINES})`);
+  }
+
+  const headerKeys = ['budget_required', 'avg_xpts', 'avg_xpts_dollar_impact', 'avg_budget_uplift'] as const;
+  const headerValues: Record<string, number | null> = {};
+  for (let i = 0; i < 4; i++) {
+    const key = headerKeys[i];
+    if (i < lines.length) {
+      const n = parseFloat(lines[i]);
+      if (isNaN(n)) {
+        headerValues[key] = null;
+        flags.push(`parse_error: line ${i + 1} not a number: ${JSON.stringify(lines[i])}`);
+      } else {
+        headerValues[key] = n;
+      }
+    } else {
+      headerValues[key] = null;
+    }
+  }
+
+  const pctKeys = ['p95', 'p75', 'p50', 'p25', 'p05'] as const;
+  const pctValues: Record<string, number | null> = {};
+  for (let j = 0; j < 5; j++) {
+    const key = pctKeys[j];
+    const i = 4 + j;
+    if (i < lines.length) {
+      const n = parseFloat(lines[i]);
+      if (isNaN(n)) {
+        pctValues[key] = null;
+        flags.push(`parse_error: line ${i + 1} not a number: ${JSON.stringify(lines[i])}`);
+      } else {
+        pctValues[key] = n;
+      }
+    } else {
+      pctValues[key] = null;
+    }
   }
 
   const drivers: Driver[] = [];
-  for (let i = 1; i <= 5; i++) {
-    drivers.push({
-      name: String(obj[`driver_${i}`] ?? '???').toUpperCase().slice(0, 3),
-      multiplier: obj[`driver_${i}_2x`] ? '2X' : null,
-    });
+  for (let j = 0; j < 5; j++) {
+    const i = 9 + j;
+    if (i < lines.length) {
+      const raw_line = lines[i].toUpperCase();
+      if (raw_line.endsWith(' 2X')) {
+        drivers.push({ name: raw_line.slice(0, -3).trim(), multiplier: '2X' });
+      } else if (raw_line.endsWith('2X')) {
+        drivers.push({ name: raw_line.slice(0, -2).trim(), multiplier: '2X' });
+      } else {
+        drivers.push({ name: raw_line, multiplier: null });
+      }
+    } else {
+      drivers.push({ name: '???', multiplier: null });
+    }
   }
 
   return {
-    header: {
-      budget_required: Number(obj.budget_required),
-      avg_xpts: Number(obj.avg_xpts),
-      avg_xpts_dollar_impact: Number(obj.avg_xpts_dollar_impact),
-      avg_budget_uplift: obj.avg_budget_uplift != null ? Number(obj.avg_budget_uplift) : null,
+    extraction: {
+      header: {
+        budget_required: headerValues.budget_required as number,
+        avg_xpts: headerValues.avg_xpts as number,
+        avg_xpts_dollar_impact: headerValues.avg_xpts_dollar_impact as number,
+        avg_budget_uplift: headerValues.avg_budget_uplift,
+      },
+      percentiles: {
+        p95: pctValues.p95 as number,
+        p75: pctValues.p75 as number,
+        p50: pctValues.p50 as number,
+        p25: pctValues.p25 as number,
+        p05: pctValues.p05 as number,
+      },
+      drivers,
+      raw_response: raw,
     },
-    percentiles: {
-      p05: Number(obj.p05),
-      p25: Number(obj.p25),
-      p50: Number(obj.p50),
-      p75: Number(obj.p75),
-      p95: Number(obj.p95),
-    },
-    drivers,
-    raw_response: raw,
+    flags,
   };
 }
 
@@ -116,7 +161,7 @@ async function callGemini(blob: Blob, apiKey: string, prompt: string): Promise<s
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+  const timeoutId = setTimeout(() => controller.abort(), 90_000);
   let response: Response;
   try {
     response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
@@ -127,7 +172,7 @@ async function callGemini(blob: Blob, apiKey: string, prompt: string): Promise<s
     });
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
-      throw new Error('Gemini API request timed out after 30s');
+      throw new Error('Gemini API request timed out after 90s');
     }
     throw err;
   } finally {
@@ -145,16 +190,6 @@ async function callGemini(blob: Blob, apiKey: string, prompt: string): Promise<s
     throw new Error('Gemini returned no usable candidate (safety filter or empty response)');
   }
   return candidate.content.parts[0].text;
-}
-
-function extractionsAgree(a: RawExtraction, b: RawExtraction): boolean {
-  const pa = a.percentiles, pb = b.percentiles;
-  if (pa.p50 !== pb.p50) return false;
-  if (pa.p05 !== pb.p05 || pa.p95 !== pb.p95) return false;
-  if (a.header.budget_required !== b.header.budget_required) return false;
-  const da = a.drivers.map(d => d.name + (d.multiplier ?? '')).join('');
-  const db = b.drivers.map(d => d.name + (d.multiplier ?? '')).join('');
-  return da === db;
 }
 
 export interface ExtractionResult {
@@ -194,24 +229,15 @@ class RateLimiter {
   }
 }
 
-// 7 tokens/min: each crop makes 2 Gemini calls, so 7 crops/min = 14 RPM — safely under the 15 RPM free tier limit.
-export const rateLimiter = new RateLimiter(7);
+// 14 tokens/min: one Gemini call per crop = 14 RPM — safely under the 15 RPM free tier limit.
+export const rateLimiter = new RateLimiter(14);
 
-/**
- * Extracts structured data from a single preprocessed crop PNG Blob.
- * Runs pass 1; if it disagrees with pass 2, marks the result needsReview.
- */
 export async function extractCrop(blob: Blob, apiKey: string): Promise<ExtractionResult> {
-  // One token per crop (two Gemini calls per crop, but rate-limited at crop granularity)
   await rateLimiter.acquire();
-  const raw1 = await callGemini(blob, apiKey, PROMPT_PASS1);
-  const ext1 = parseGeminiResponse(raw1);
-
-  const raw2 = await callGemini(blob, apiKey, PROMPT_PASS2);
-  const ext2 = parseGeminiResponse(raw2);
-
+  const raw = await callGemini(blob, apiKey, PROMPT);
+  const { extraction, flags } = parseGeminiResponse(raw);
   return {
-    extraction: ext1,
-    needsReview: !extractionsAgree(ext1, ext2),
+    extraction,
+    needsReview: flags.length > 0,
   };
 }
