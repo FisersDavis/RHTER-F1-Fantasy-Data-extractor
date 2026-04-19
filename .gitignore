@@ -21,6 +21,9 @@ data/
 node_modules/
 dist/
 
+# Tailwind standalone CLI binary (downloaded locally, not committed)
+tailwindcss.exe
+
 # Git worktrees
 .worktrees/
 .gitnexus
