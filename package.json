@@ -3,11 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "esbuild src/app.ts --bundle --outfile=docs/app.js --watch",
+    "dev": "concurrently \"esbuild src/app.ts --bundle --outfile=docs/app.js --watch\" \"./tailwindcss.exe -i src/input.css -o docs/style.css --watch\" \"serve docs -l 3000\"",
     "build": "esbuild src/app.ts --bundle --minify --outfile=docs/app.js"
   },
   "devDependencies": {
+    "concurrently": "^9.1.0",
     "esbuild": "^0.20.0",
+    "serve": "^14.2.0",
     "typescript": "^5.4.0"
   }
 }
