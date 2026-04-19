@@ -24,6 +24,9 @@ dist/
 # Tailwind standalone CLI binary (downloaded locally, not committed)
 tailwindcss.exe
 
+# Generated CSS (built from src/input.css, not committed)
+docs/style.css
+
 # Git worktrees
 .worktrees/
 .gitnexus
