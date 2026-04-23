@@ -92,8 +92,10 @@ export function initExtractTab(container: HTMLElement): void {
     };
 
     try {
-      await runPipeline(file, onProgress);
-      progressLabel.textContent = 'Done! Go to the Review tab to inspect results.';
+      const { summary } = await runPipeline(file, onProgress);
+      progressLabel.textContent = summary.failed > 0
+        ? `Done with warnings: ${summary.succeeded}/${summary.totalPlanned} crops succeeded, ${summary.failed} failed.`
+        : 'Done! Go to the Review tab to inspect results.';
       progressBar.style.width = '100%';
     } catch (err) {
       errorEl.className = 'import-error';

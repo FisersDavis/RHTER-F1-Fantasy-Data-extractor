@@ -1,13 +1,7 @@
 import { getReviewedDataset } from '../dataStore.js';
 import type { WizardState } from './wizardShell.js';
 import type { ViolinCrop, Percentiles } from '../types.js';
-
-const TEAM_COLORS: Record<string, string> = {
-  MER: '#06d3bf', FER: '#dd1818', RBR: '#1e41ff',
-  MCL: '#ff6700', AMR: '#006b3c', WIL: '#005aff',
-  ALP: '#ff87bc', HAA: '#b6babd', KIC: '#52e252', SAU: '#9b0000',
-  RED: '#1e41ff',
-};
+import { CONSTRUCTOR_COLORS } from '../config.js';
 
 const SORT_LABELS: Record<string, string> = {
   kelly: 'KELLY SCORE',
@@ -109,7 +103,7 @@ function buildLineup(violin: ViolinCrop): HTMLElement {
   for (const cn of [violin.constructors.cn1, violin.constructors.cn2]) {
     const dot = document.createElement('span');
     dot.className = 'w-[8px] h-[8px] rounded-full inline-block';
-    dot.style.background = TEAM_COLORS[cn.team] ?? '#888';
+    dot.style.background = CONSTRUCTOR_COLORS[cn.team] ?? '#888';
     dot.title = cn.team;
     wrap.appendChild(dot);
     const lbl = document.createElement('span');

@@ -1,5 +1,7 @@
 import { runPipeline } from '../pipelineOrchestrator.js';
 import { getApiKey } from '../settingsPanel.js';
+import { generateDemoViolins } from './demoData.js';
+import { createUploadDebugControls, type UploadDebugControls } from './debugControls.js';
 
 const PHASE_LABELS = ['UPLOADING', 'PARSING ROWS', 'VALIDATING', 'FINALISING'];
 
@@ -180,7 +182,8 @@ export function renderUploadStep(container: HTMLElement, onComplete: () => void)
     const wrap = document.createElement('div');
     wrap.id = 'upload-area';
 
-    const zone = buildDropZone(startPipeline);
+    const debugControls = createUploadDebugControls();
+    const zone = buildDropZone((file) => startPipeline(file, debugControls));
     wrap.appendChild(zone);
 
     const demoBtn = document.createElement('button');
@@ -191,13 +194,17 @@ export function renderUploadStep(container: HTMLElement, onComplete: () => void)
       onComplete();
     });
     wrap.appendChild(demoBtn);
+    wrap.appendChild(debugControls.root);
     wrap.appendChild(buildInfoGrid());
 
     container.appendChild(wrap);
     uploadAreaEl = wrap;
   }
 
-  function startPipeline(file: File): void {
+  function startPipeline(
+    file: File,
+    debugControls: UploadDebugControls,
+  ): void {
     if (!uploadAreaEl) return;
     uploadAreaEl.innerHTML = '';
 
@@ -214,16 +221,35 @@ export function renderUploadStep(container: HTMLElement, onComplete: () => void)
       const updated = buildProgressSection(phaseIndex, percent, p.currentLabel.toUpperCase());
       uploadAreaEl!.appendChild(updated);
 
-      if (percent >= 100) {
-        setTimeout(onComplete, 400);
+    }, {
+      debugMode: debugControls.isDebugEnabled(),
+      cropLimit: debugControls.getDebugLimit(),
+    }).then(({ summary }) => {
+      uploadAreaEl!.innerHTML = '';
+      const done = document.createElement('div');
+      done.className = 'p-[20px] border border-border bg-bg1 flex flex-col gap-2';
+
+      const headline = document.createElement('p');
+      headline.className = 'font-mono text-[10px] text-text';
+      headline.textContent = `RUN COMPLETE: ${summary.succeeded}/${summary.totalPlanned} crops succeeded${summary.debugMode ? ' (DEBUG MODE)' : ''}.`;
+      done.appendChild(headline);
+
+      if (summary.failed > 0) {
+        const failed = document.createElement('p');
+        failed.className = 'font-mono text-[10px] text-accent';
+        failed.textContent = `FAILED: ${summary.failed} crop(s) at ${summary.failedCrops.map((c) => `[${c.row},${c.col}]`).join(', ')}`;
+        done.appendChild(failed);
       }
+
+      uploadAreaEl!.appendChild(done);
+      setTimeout(onComplete, 500);
     }).catch((err: Error) => {
       uploadAreaEl!.innerHTML = '';
       const errMsg = document.createElement('p');
       errMsg.className = 'font-mono text-[11px] text-accent p-[20px]';
       errMsg.textContent = `PIPELINE ERROR: ${err.message}`;
       uploadAreaEl!.appendChild(errMsg);
-      uploadAreaEl!.appendChild(buildDropZone(startPipeline));
+      uploadAreaEl!.appendChild(buildDropZone((retryFile) => startPipeline(retryFile, debugControls)));
     });
   }
 
@@ -241,58 +267,4 @@ export function renderUploadStep(container: HTMLElement, onComplete: () => void)
   }
 
   showUploadArea();
-}
-
-function generateDemoViolins(): unknown[] {
-  const DRIVER_SETS = [
-    ['VER', 'NOR', 'PIA'],
-    ['HAM', 'RUS', 'LEC'],
-    ['SAI', 'ALO', 'STR'],
-    ['TSU', 'GAS', 'OCO'],
-    ['HUL', 'MAG', 'BOT'],
-    ['ZHO', 'LAW', 'COL'],
-  ];
-  const CN_PAIRS = [
-    ['MCL', 'RED'], ['MER', 'FER'], ['AMR', 'WIL'],
-    ['ALP', 'HAA'], ['MCL', 'MER'], ['RED', 'FER'],
-  ];
-  const TEAM_COLORS: Record<string, [number, number, number]> = {
-    MCL: [255, 103, 0], RED: [30, 65, 255], MER: [6, 211, 191],
-    FER: [221, 24, 24], AMR: [0, 107, 60], WIL: [0, 90, 255],
-    ALP: [255, 135, 188], HAA: [182, 186, 189],
-  };
-
-  const violins = [];
-  for (let i = 0; i < 6; i++) {
-    const p50 = 80 + Math.round(Math.random() * 40);
-    const spread = 10 + Math.round(Math.random() * 20);
-    const [cn1, cn2] = CN_PAIRS[i];
-    violins.push({
-      row: Math.floor(i / 3),
-      col: i % 3,
-      header: {
-        budget_required: 95 + Math.round(Math.random() * 20),
-        avg_xpts: p50,
-        avg_xpts_dollar_impact: 0.8,
-        avg_budget_uplift: null,
-      },
-      percentiles: {
-        p05: p50 - spread * 2,
-        p25: p50 - spread,
-        p50,
-        p75: p50 + spread,
-        p95: p50 + spread * 2,
-      },
-      drivers: DRIVER_SETS[i].map((name, j) => ({ name, multiplier: j === 0 ? '2X' : null })),
-      constructors: {
-        cn1: { color_rgb: TEAM_COLORS[cn1] ?? null, team: cn1 },
-        cn2: { color_rgb: TEAM_COLORS[cn2] ?? null, team: cn2 },
-      },
-      confidence: 'high' as const,
-      flagged: i === 2,
-      flag_reasons: i === 2 ? ['P95 OUTLIER'] : [],
-      raw_response: '',
-    });
-  }
-  return violins;
 }

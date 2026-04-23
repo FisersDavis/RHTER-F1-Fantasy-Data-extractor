@@ -14,6 +14,21 @@ export const CONSTRUCTOR_COLORS: Record<string, string> = {
 };
 
 export const TEAMS = Object.keys(CONSTRUCTOR_COLORS);
+export const CONSTRUCTOR_CODES = [...TEAMS];
+
+export const CONSTRUCTOR_RGB: Record<string, [number, number, number]> = {
+  MCL: [255, 135, 0],
+  MER: [0, 210, 190],
+  RED: [0, 27, 94],
+  FER: [220, 0, 0],
+  WIL: [0, 87, 255],
+  VRB: [106, 180, 228],
+  AST: [0, 111, 73],
+  HAA: [255, 255, 255],
+  AUD: [122, 0, 40],
+  ALP: [255, 135, 188],
+  CAD: [192, 192, 192],
+};
 
 // Lab reference colors for Delta-E matching (L, a, b)
 // Derived from the hex values above via standard sRGB→Lab transform

@@ -1,3 +1,5 @@
+## Legacy-only Python pipeline dependencies.
+## The active extraction workflow now runs in-browser; keep these for archival/maintenance only.
 Pillow>=10.0
 numpy>=1.24
 scikit-learn>=1.3

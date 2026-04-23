@@ -15,10 +15,39 @@ export interface PipelineProgress {
 
 export type ProgressCallback = (p: PipelineProgress) => void;
 
+export interface PipelineRunOptions {
+  debugMode?: boolean;
+  cropLimit?: number | null;
+}
+
+export interface FailedCrop {
+  row: number;
+  col: number;
+  message: string;
+}
+
+export interface PipelineRunSummary {
+  totalPlanned: number;
+  attempted: number;
+  succeeded: number;
+  failed: number;
+  failedCrops: FailedCrop[];
+  debugMode: boolean;
+}
+
+export interface PipelineRunResult {
+  crops: ViolinCrop[];
+  summary: PipelineRunSummary;
+}
+
 const INCREMENTAL_KEY = 'pipeline_incremental';
 
-// Set to a small number during UI testing; remove (or set to Infinity) for full runs.
-const TEST_CROP_LIMIT = 1;
+function normaliseCropLimit(value?: number | null): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  const rounded = Math.floor(value);
+  if (rounded < 1) return null;
+  return rounded;
+}
 
 /**
  * Runs the full pipeline (stages 0–4) on a screenshot file.
@@ -29,7 +58,8 @@ const TEST_CROP_LIMIT = 1;
 export async function runPipeline(
   file: File,
   onProgress: ProgressCallback,
-): Promise<ViolinCrop[]> {
+  options: PipelineRunOptions = {},
+): Promise<PipelineRunResult> {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('No Gemini API key set. Go to Settings first.');
 
@@ -39,19 +69,23 @@ export async function runPipeline(
   (window as unknown as Record<string, unknown>).__lastCrops = { raw };
 
   const results: ViolinCrop[] = [];
+  const failedCrops: FailedCrop[] = [];
   localStorage.setItem(INCREMENTAL_KEY, JSON.stringify([]));
 
   let completed = 0;
   if (!raw.length || !raw[0].length) throw new Error('No crops produced from screenshot');
-  const total = Math.min(raw.length * raw[0].length, TEST_CROP_LIMIT);
+  const available = raw.length * raw[0].length;
+  const debugMode = Boolean(options.debugMode);
+  const requestedLimit = debugMode ? normaliseCropLimit(options.cropLimit) : null;
+  const total = requestedLimit == null ? available : Math.min(available, requestedLimit);
 
   outer: for (let row = 0; row < raw.length; row++) {
     for (let col = 0; col < raw[row].length; col++) {
-      if (completed >= TEST_CROP_LIMIT) break outer;
+      if (completed >= total) break outer;
       onProgress({
         completed,
         total,
-        currentLabel: `Extracting crop ${completed + 1} of ${total} (row ${row}, col ${col})…`,
+        currentLabel: `Extracting crop ${completed + 1} of ${total} (row ${row}, col ${col})${debugMode ? ' [DEBUG]' : ''}…`,
       });
 
       try {
@@ -112,6 +146,8 @@ export async function runPipeline(
         results.push(crop);
       } catch (err) {
         console.error(`Crop [${row},${col}] failed:`, err);
+        const message = err instanceof Error ? err.message : String(err);
+        failedCrops.push({ row, col, message });
       }
 
       completed++;
@@ -126,7 +162,16 @@ export async function runPipeline(
   importJSON(results);
   localStorage.removeItem(INCREMENTAL_KEY);
 
-  return results;
+  const summary: PipelineRunSummary = {
+    totalPlanned: total,
+    attempted: completed,
+    succeeded: results.length,
+    failed: failedCrops.length,
+    failedCrops,
+    debugMode,
+  };
+
+  return { crops: results, summary };
 }
 
 /**
