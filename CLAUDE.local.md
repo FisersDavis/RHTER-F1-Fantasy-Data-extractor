@@ -1,5 +1,11 @@
 # Project: RHTER F1 Fantasy Data Extractor
 
+## Agent entry files
+
+- **`AGENTS.md`** — primary agent rules: browser-first workflow, `npm run dev` / `npm run build`, do not hand-edit `docs/app.js`.
+- **`CLAUDE.md`** — thin pointer for Claude Code users to `AGENTS.md` and this file.
+- **`CLAUDE.local.md`** (this file) — architecture, module map, legacy boundary, acceptance checks, and product wording.
+
 ## What this is
 
 This project is now **browser-first and browser-primary**:
@@ -57,6 +63,8 @@ Build output:
 2. Upload a valid screenshot in the wizard.
 3. Verify end-to-end flow: Upload -> Review -> Analysis.
 
+Optional URL query overrides for the upload step (advanced): `wizard_debug=1` or `wizard_debug=true` forces Debug Mode on when the debug panel is created; `wizard_limit=<positive integer>` seeds the debug crop limit field (both are applied once at load and still persist via the same localStorage keys as the UI).
+
 ### Required acceptance checks
 
 - Full run can process all 72 crops when Debug Mode is off.
@@ -76,3 +84,4 @@ After `npm run build`, validate the same flow on the deployed Pages site:
 - Keep browser modules (`src/**/*.ts`) as source of truth.
 - Never edit `docs/app.js` manually; always regenerate from `src/`.
 - If touching legacy Python files, label the change as legacy maintenance in notes and commits.
+- Do not commit optional local index or cache directories created by old tooling under the repo root; keep them out of version control (for example via your global gitignore).

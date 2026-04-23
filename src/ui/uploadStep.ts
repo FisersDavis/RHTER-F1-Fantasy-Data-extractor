@@ -102,7 +102,12 @@ function buildDropZone(onFile: (file: File) => void): HTMLElement {
   return zone;
 }
 
-function buildProgressSection(phaseIndex: number, percent: number, label?: string): HTMLElement {
+function buildProgressSection(
+  phaseIndex: number,
+  percent: number,
+  label?: string,
+  subtitle?: string,
+): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'min-h-[360px] bg-bg1 border border-border flex flex-col justify-center px-[40px] gap-4';
 
@@ -110,6 +115,13 @@ function buildProgressSection(phaseIndex: number, percent: number, label?: strin
   phaseLabel.className = 'font-mono text-[9px] uppercase tracking-[0.18em] text-dim';
   phaseLabel.textContent = label ?? PHASE_LABELS[phaseIndex] ?? 'PROCESSING';
   wrap.appendChild(phaseLabel);
+
+  if (subtitle) {
+    const sub = document.createElement('span');
+    sub.className = 'font-mono text-[9px] uppercase tracking-[0.14em] text-muted';
+    sub.textContent = subtitle;
+    wrap.appendChild(sub);
+  }
 
   const track = document.createElement('div');
   track.className = 'w-full h-[2px] bg-bg2';
@@ -210,7 +222,8 @@ export function renderUploadStep(container: HTMLElement, onComplete: () => void)
 
     let phaseIndex = 0;
     let percent = 0;
-    const progress = buildProgressSection(phaseIndex, percent);
+    const runModeSubtitle = debugControls.getRunModeSubtitle();
+    const progress = buildProgressSection(phaseIndex, percent, undefined, runModeSubtitle);
     uploadAreaEl.appendChild(progress);
 
     runPipeline(file, (p) => {
@@ -218,7 +231,12 @@ export function renderUploadStep(container: HTMLElement, onComplete: () => void)
       phaseIndex = Math.min(3, Math.floor((p.completed / p.total) * 4));
 
       uploadAreaEl!.innerHTML = '';
-      const updated = buildProgressSection(phaseIndex, percent, p.currentLabel.toUpperCase());
+      const updated = buildProgressSection(
+        phaseIndex,
+        percent,
+        p.currentLabel.toUpperCase(),
+        runModeSubtitle,
+      );
       uploadAreaEl!.appendChild(updated);
 
     }, {

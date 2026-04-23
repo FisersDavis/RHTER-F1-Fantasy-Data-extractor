@@ -29,4 +29,5 @@ docs/style.css
 
 # Git worktrees
 .worktrees/
-.gitnexus
+
+# optional local tooling output dirs — add to your global gitignore if needed
