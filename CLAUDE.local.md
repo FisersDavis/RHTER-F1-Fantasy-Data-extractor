@@ -33,15 +33,19 @@ All active extraction stages run in-browser:
 
 - `pipeline/` and `tests/test_*.py` are **legacy maintenance artifacts**.
 - Do not treat Python as the default pipeline in docs, UX copy, or implementation plans.
+- **Phase 2 §C policy:** Python and pytest files stay **in the repository** as legacy maintenance-only material (no relocation or deletion in this pass); browser work does not depend on them.
 
 ## Active source layout
 
 - `src/app.ts` — app entry point
-- `src/pipelineOrchestrator.ts` — browser pipeline execution
+- `src/apiKeyStore.ts` — Gemini API key read/write in localStorage (used by the wizard upload step)
+- `src/runMode.ts` — full vs debug run labels (`RunMode`, `FULL_CROP_COUNT`)
+- `src/pipelineOrchestrator.ts` — browser pipeline execution (callers pass `apiKey`; optional `debugHooks` / incremental overrides)
+- `src/ui/debugControls.ts` — Debug Mode, crop limit, URL overrides, optional “save each preprocessed crop” diagnostics (typed hooks; not `window.__debugPreprocess`)
 - `src/ui/uploadStep.ts` — upload + run controls
 - `src/ui/reviewStep.ts` — review and correction
 - `src/ui/analysisStep.ts` — ranking and comparison view
-- `src/dataStore.ts` — dataset import/export + persistence
+- `src/dataStore.ts` — dataset import/export + persistence + pipeline incremental snapshot helpers (`pipeline_incremental` in localStorage)
 - `src/config.ts` — canonical team/constructor constants
 
 Build output:
@@ -49,6 +53,7 @@ Build output:
 - `docs/app.js` (generated via `npm run build`)
 - `docs/style.css`
 - `docs/index.html`
+- **`docs/DEBUGGING.md`** — how to use Debug Mode, URL overrides, and preprocessed crop diagnostics (user and developer reference)
 
 ## Product wording conventions
 
@@ -63,7 +68,7 @@ Build output:
 2. Upload a valid screenshot in the wizard.
 3. Verify end-to-end flow: Upload -> Review -> Analysis.
 
-Optional URL query overrides for the upload step (advanced): `wizard_debug=1` or `wizard_debug=true` forces Debug Mode on when the debug panel is created; `wizard_limit=<positive integer>` seeds the debug crop limit field (both are applied once at load and still persist via the same localStorage keys as the UI).
+Optional URL query overrides for the upload step (advanced): `wizard_debug=1` or `wizard_debug=true` forces Debug Mode on when the debug panel is created; `wizard_limit=<positive integer>` seeds the debug crop limit field (both are applied once at load and still persist via the same localStorage keys as the UI). Optional per-crop preprocessed PNG downloads are controlled only from the Upload debug panel (“save each preprocessed crop”) when Debug Mode is on, not via globals.
 
 ### Required acceptance checks
 

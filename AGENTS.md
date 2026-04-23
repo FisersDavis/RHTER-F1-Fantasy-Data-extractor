@@ -11,6 +11,7 @@ This repo is **browser-first**: the wizard in `docs/` (built from `src/`) is the
 ## Where to read next
 
 - **`CLAUDE.local.md`** — architecture, module map, legacy boundary, acceptance checks, and product wording (e.g. prefer **"extracted dataset JSON"**).
+- **`docs/DEBUGGING.md`** — Debug Mode, crop limits, URL query overrides, and preprocessed-crop diagnostics for the wizard.
 
 ## Guardrails
 

@@ -1,5 +1,24 @@
 import type { ViolinCrop, DatasetMeta } from './types.js';
 
+const PIPELINE_INCREMENTAL_KEY = 'pipeline_incremental';
+
+export function resetPipelineIncremental(): void {
+  localStorage.setItem(PIPELINE_INCREMENTAL_KEY, JSON.stringify([]));
+}
+
+export function writePipelineIncremental(crops: ViolinCrop[]): void {
+  localStorage.setItem(PIPELINE_INCREMENTAL_KEY, JSON.stringify(crops));
+}
+
+export function clearPipelineIncremental(): void {
+  localStorage.removeItem(PIPELINE_INCREMENTAL_KEY);
+}
+
+export function readPipelineIncremental(): ViolinCrop[] | null {
+  const raw = localStorage.getItem(PIPELINE_INCREMENTAL_KEY);
+  return raw ? (JSON.parse(raw) as ViolinCrop[]) : null;
+}
+
 export function getDatasets(): DatasetMeta[] {
   return JSON.parse(localStorage.getItem('datasetIndex') || '[]') as DatasetMeta[];
 }

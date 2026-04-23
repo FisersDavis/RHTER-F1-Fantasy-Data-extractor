@@ -1,13 +1,10 @@
 import { runPipeline } from '../pipelineOrchestrator.js';
-import { getApiKey } from '../settingsPanel.js';
+import { getApiKey, setApiKey } from '../apiKeyStore.js';
+import { formatRunModeSubtitle, FULL_CROP_COUNT } from '../runMode.js';
 import { generateDemoViolins } from './demoData.js';
 import { createUploadDebugControls, type UploadDebugControls } from './debugControls.js';
 
 const PHASE_LABELS = ['UPLOADING', 'PARSING ROWS', 'VALIDATING', 'FINALISING'];
-
-function saveApiKey(key: string): void {
-  localStorage.setItem('rhter_gemini_key', key);
-}
 
 function buildApiKeyCard(onSaved: () => void): HTMLElement {
   const card = document.createElement('div');
@@ -30,10 +27,10 @@ function buildApiKeyCard(onSaved: () => void): HTMLElement {
   saveBtn.textContent = 'SAVE';
   saveBtn.className = 'border border-accent text-accent font-mono text-[10px] uppercase tracking-[0.18em] px-[16px] py-[6px] hover:bg-accent hover:text-white transition-colors duration-100';
 
-  saveBtn.addEventListener('click', () => {
+    saveBtn.addEventListener('click', () => {
     const key = input.value.trim();
     if (!key) return;
-    saveApiKey(key);
+    setApiKey(key);
     onSaved();
   });
 
@@ -222,26 +219,44 @@ export function renderUploadStep(container: HTMLElement, onComplete: () => void)
 
     let phaseIndex = 0;
     let percent = 0;
-    const runModeSubtitle = debugControls.getRunModeSubtitle();
-    const progress = buildProgressSection(phaseIndex, percent, undefined, runModeSubtitle);
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      uploadAreaEl.innerHTML = '';
+      uploadAreaEl.appendChild(buildApiKeyCard(() => {
+        container.innerHTML = '';
+        renderUploadStep(container, onComplete);
+      }));
+      return;
+    }
+
+    const dbg = debugControls.isDebugEnabled();
+    const initialPlanned = dbg ? (debugControls.getDebugLimit() ?? 6) : FULL_CROP_COUNT;
+    const progress = buildProgressSection(
+      phaseIndex,
+      percent,
+      undefined,
+      formatRunModeSubtitle(dbg ? 'debug' : 'full', initialPlanned),
+    );
     uploadAreaEl.appendChild(progress);
 
     runPipeline(file, (p) => {
-      percent = Math.round((p.completed / p.total) * 100);
-      phaseIndex = Math.min(3, Math.floor((p.completed / p.total) * 4));
+      percent = p.total > 0 ? Math.round((p.completed / p.total) * 100) : 0;
+      phaseIndex = p.total > 0 ? Math.min(3, Math.floor((p.completed / p.total) * 4)) : 0;
 
       uploadAreaEl!.innerHTML = '';
       const updated = buildProgressSection(
         phaseIndex,
         percent,
         p.currentLabel.toUpperCase(),
-        runModeSubtitle,
+        formatRunModeSubtitle(p.runMode, p.total),
       );
       uploadAreaEl!.appendChild(updated);
 
     }, {
+      apiKey,
       debugMode: debugControls.isDebugEnabled(),
       cropLimit: debugControls.getDebugLimit(),
+      debugHooks: debugControls.getDebugHooks(),
     }).then(({ summary }) => {
       uploadAreaEl!.innerHTML = '';
       const done = document.createElement('div');
@@ -249,7 +264,7 @@ export function renderUploadStep(container: HTMLElement, onComplete: () => void)
 
       const headline = document.createElement('p');
       headline.className = 'font-mono text-[10px] text-text';
-      headline.textContent = `RUN COMPLETE: ${summary.succeeded}/${summary.totalPlanned} crops succeeded${summary.debugMode ? ' (DEBUG MODE)' : ''}.`;
+      headline.textContent = `RUN COMPLETE: ${summary.succeeded}/${summary.totalPlanned} crops succeeded${summary.runMode === 'debug' ? ' (DEBUG RUN)' : ''}.`;
       done.appendChild(headline);
 
       if (summary.failed > 0) {

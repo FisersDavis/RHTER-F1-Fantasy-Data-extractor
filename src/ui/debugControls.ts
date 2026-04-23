@@ -1,6 +1,9 @@
-const FULL_CROP_COUNT = 72;
+import type { PipelineDebugHooks } from '../pipelineOrchestrator.js';
+import { formatRunModeSubtitle, FULL_CROP_COUNT, type RunMode } from '../runMode.js';
+
 const DEBUG_MODE_KEY = 'wizard_debug_mode';
 const DEBUG_LIMIT_KEY = 'wizard_debug_limit';
+const PREPROCESS_DIAG_KEY = 'wizard_preprocess_diag';
 
 type UrlOverrides = { forceDebug?: boolean; limit?: number };
 
@@ -21,12 +24,9 @@ function parseWizardUrlOverrides(): UrlOverrides {
   }
 }
 
-function formatRunModeLine(debugOn: boolean, limit: number | null): string {
-  if (!debugOn) {
-    return `RUN MODE: FULL (${FULL_CROP_COUNT} CROPS)`;
-  }
-  const n = limit ?? 6;
-  return `RUN MODE: DEBUG (UP TO ${n} CROPS)`;
+function plannedTotalForDisplay(debugOn: boolean, limit: number | null): number {
+  if (!debugOn) return FULL_CROP_COUNT;
+  return limit ?? 6;
 }
 
 export type UploadDebugControls = {
@@ -34,6 +34,7 @@ export type UploadDebugControls = {
   isDebugEnabled: () => boolean;
   getDebugLimit: () => number | null;
   getRunModeSubtitle: () => string;
+  getDebugHooks: () => PipelineDebugHooks | undefined;
 };
 
 export function createUploadDebugControls(): UploadDebugControls {
@@ -68,17 +69,32 @@ export function createUploadDebugControls(): UploadDebugControls {
   limitWrap.appendChild(limitLabel);
   limitWrap.appendChild(limitInput);
 
+  const diagRow = document.createElement('label');
+  diagRow.className = 'flex items-center justify-between gap-4 cursor-pointer';
+  const diagLabel = document.createElement('span');
+  diagLabel.className = 'text-[9px] uppercase tracking-[0.18em] text-muted font-mono';
+  diagLabel.textContent = 'SAVE EACH PREPROCESSED CROP (SLOW)';
+  const diagToggle = document.createElement('input');
+  diagToggle.type = 'checkbox';
+  diagToggle.className = 'accent-accent';
+  diagRow.appendChild(diagLabel);
+  diagRow.appendChild(diagToggle);
+
   const readLimitFromInput = (): number | null => {
     const value = Number(limitInput.value);
     return Number.isFinite(value) && value >= 1 ? Math.floor(value) : null;
   };
 
   const refreshRunMode = (): void => {
-    runModeEl.textContent = formatRunModeLine(toggle.checked, readLimitFromInput());
+    const debugOn = toggle.checked;
+    const runMode: RunMode = debugOn ? 'debug' : 'full';
+    const planned = plannedTotalForDisplay(debugOn, readLimitFromInput());
+    runModeEl.textContent = formatRunModeSubtitle(runMode, planned);
   };
 
   toggle.checked = localStorage.getItem(DEBUG_MODE_KEY) === '1';
   limitInput.value = localStorage.getItem(DEBUG_LIMIT_KEY) ?? '6';
+  diagToggle.checked = localStorage.getItem(PREPROCESS_DIAG_KEY) === '1';
 
   const url = parseWizardUrlOverrides();
   if (url.forceDebug) {
@@ -93,9 +109,11 @@ export function createUploadDebugControls(): UploadDebugControls {
   root.appendChild(runModeEl);
   root.appendChild(toggleRow);
   root.appendChild(limitWrap);
+  root.appendChild(diagRow);
 
   const syncLimitVisibility = (): void => {
     limitWrap.style.display = toggle.checked ? 'flex' : 'none';
+    diagRow.style.display = toggle.checked ? 'flex' : 'none';
   };
   syncLimitVisibility();
   refreshRunMode();
@@ -112,11 +130,32 @@ export function createUploadDebugControls(): UploadDebugControls {
   limitInput.addEventListener('input', () => {
     refreshRunMode();
   });
+  diagToggle.addEventListener('change', () => {
+    localStorage.setItem(PREPROCESS_DIAG_KEY, diagToggle.checked ? '1' : '0');
+  });
+
+  const getDebugHooks = (): PipelineDebugHooks | undefined => {
+    if (!toggle.checked || !diagToggle.checked) return undefined;
+    return {
+      onPreprocessedBlob: ({ row, col, blob }) => {
+        const debugUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = debugUrl;
+        a.download = `crop_debug_r${row}_c${col}.png`;
+        a.click();
+        URL.revokeObjectURL(debugUrl);
+      },
+    };
+  };
 
   return {
     root,
     isDebugEnabled: () => toggle.checked,
     getDebugLimit: () => readLimitFromInput(),
-    getRunModeSubtitle: () => formatRunModeLine(toggle.checked, readLimitFromInput()),
+    getRunModeSubtitle: () => {
+      const runMode: RunMode = toggle.checked ? 'debug' : 'full';
+      return formatRunModeSubtitle(runMode, plannedTotalForDisplay(toggle.checked, readLimitFromInput()));
+    },
+    getDebugHooks,
   };
 }
