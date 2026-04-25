@@ -30,8 +30,9 @@ docs/style.css
 # Git worktrees
 .worktrees/
 
-# GitNexus local index — must never be committed (audit Phase 2)
+# GitNexus local index and HuggingFace embedding cache — must never be committed (audit Phase 2)
 .gitnexus/
 .gitnexusignore
+undefined/
 
 # optional local tooling output dirs — add to your global gitignore if needed
