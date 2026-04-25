@@ -27,7 +27,7 @@ function buildApiKeyCard(onSaved: () => void): HTMLElement {
   saveBtn.textContent = 'SAVE';
   saveBtn.className = 'border border-accent text-accent font-mono text-[10px] uppercase tracking-[0.18em] px-[16px] py-[6px] hover:bg-accent hover:text-white transition-colors duration-100';
 
-    saveBtn.addEventListener('click', () => {
+  saveBtn.addEventListener('click', () => {
     const key = input.value.trim();
     if (!key) return;
     setApiKey(key);
