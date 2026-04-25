@@ -289,3 +289,66 @@ The plan recommends Option 1 (preferred, minimal-churn). Expected end state:
 - Renaming `docs/app.js` / restructuring the `docs/` build output.
 - Any refactor of the two-pass extraction or constructor-colour matching beyond constant unification.
 - Wizard navigation/UX changes outside the Upload step's debug panel and run summary.
+
+---
+
+## Migration retrospective (Phase 2 audit follow-up)
+
+A post-migration audit identified three follow-up issues that this spec did not anticipate. They were resolved in the Phase 2 cleanup pass (see `docs/superpowers/plans/phase-2-cleanup.plan.md`); this section is the durable record.
+
+### Over-scope deletion in commit `158ce42`
+
+Commit `158ce42` ("Refactor and enhance documentation for agent workflows") deleted nine source files totalling ~1363 lines that this spec did not authorise. Eight were unreachable from `app.ts`; one (`src/settingsPanel.ts`) was authorised by Todo 1's API-key relocation. The full list:
+
+| Deleted file | Lines | Status at baseline |
+|---|---|---|
+| `src/analysis.ts` | 178 | Dead |
+| `src/review.ts` | 257 | Dead |
+| `src/extractTab.ts` | 107 | Dead |
+| `src/areaChart.ts` | 52 | Dead |
+| `src/settingsPanel.ts` | 78 | Live — replaced by `src/apiKeyStore.ts` (Todo 1) |
+| `docs/analysis.js` | 186 | Dead |
+| `docs/review.js` | 296 | Dead |
+| `docs/dataStore.js` | 148 | Dead |
+| `docs/areaChart.js` | 59 | Dead |
+
+The deletions did not break the active code path (`tsc --noEmit` and `npm run build` continued to pass), but the commit subject undersold the change. Future deletions of this size should land in their own commit with a subject naming the cull.
+
+### History rewrite (Task 3, 2026-04-25)
+
+Phase 2 Task 3 evaluated whether to scrub the 52 MB `.gitnexus/lbug` binary from history with `git filter-repo`. The decision was: **rewrote with `git filter-repo` on 2026-04-25; force-pushed `feat/browser-pipeline-typescript` to origin**.
+
+Reasoning: the lbug blob was 54,513,664 bytes of GitNexus local index that should never have been committed; leaving it in history would have permanently inflated every clone of the repo. The branch is currently maintained by a single contributor (no shared in-flight branches to coordinate), so the force-push was safe. A mirror clone was made at `..\rhter-f1-mirror-backup.git` before rewriting.
+
+Commands used (from the workspace root):
+
+```powershell
+git clone --mirror . ..\rhter-f1-mirror-backup.git
+py -m git_filter_repo --path .gitnexus --invert-paths --force
+py -m git_filter_repo --path .gitnexusignore --invert-paths --force
+git remote add origin https://github.com/FisersDavis/RHTER-F1-Fantasy-Data-extractor.git
+git push --force-with-lease=feat/browser-pipeline-typescript origin feat/browser-pipeline-typescript
+```
+
+Result: HEAD was rewritten from `b9e18fd191b16c754783169feb03235e624faad9` to `3684c408e75cf1813b152e1948c0d61e8f990720`. All 96 commits preserved (no commits dropped, only paths within them scrubbed). `git rev-list --objects --all | rg "\.gitnexus/lbug"` returns no matches post-rewrite.
+
+### History rewrite, extension (Task 3b, 2026-04-25)
+
+During Task 3, GitHub's pre-receive warning surfaced a second tracked artefact: an ~86 MB ONNX model at `undefined/.cache/huggingface/Snowflake/snowflake-arctic-embed-xs/onnx/model.onnx`, plus three small siblings (`config.json`, `tokenizer.json`, `tokenizer_config.json`). The path-traversal `undefined/` prefix indicates a buggy tool wrote its cache when its `cwd` resolved to literal `'undefined'`. The audit had not flagged this — it lacks `gitnexus` in the name — but the artefact was effectively the embedding model GitNexus tooling used.
+
+Task 3b extended the scrub to remove `undefined/**` from history and added `undefined/` to `.gitignore`:
+
+```powershell
+py -m git_filter_repo --path undefined --invert-paths --force
+git reflog expire --expire=now --all
+git gc --prune=now --aggressive
+# .gitignore updated to include undefined/
+git push --force-with-lease=feat/browser-pipeline-typescript origin feat/browser-pipeline-typescript
+```
+
+Result: HEAD moved from `3684c408e75cf1813b152e1948c0d61e8f990720` to `e805145eafead9ce06393e352696c87bdd2c68c5` (97 commits: 96 from filter-repo + 1 fresh `.gitignore` commit). Pack size dropped from 83.66 MiB (post-Task-3) to **4.06 MiB** — a roughly 95% reduction relative to the pre-Phase-2 baseline of ~86 MiB.
+
+### Follow-up not addressed
+
+- The `..\rhter-f1-mirror-backup.git` mirror clone is still on disk; the user should keep it until they're satisfied no recovery is needed, then delete it manually.
+- Anyone with a clone of the pre-rewrite branch (other developer machines, CI caches) must `git fetch && git reset --hard origin/feat/browser-pipeline-typescript` or re-clone. There is no automated way to detect or notify those clones.
